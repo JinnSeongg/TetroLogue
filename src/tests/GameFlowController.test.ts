@@ -17,7 +17,7 @@ class MemoryRepository implements SaveRunRepository {
 }
 
 describe("GameFlowController", () => {
-  it("plays through menu, combat, reward, map, boss, and run result", () => {
+  it("plays through the current floor, reward, next floor, and final clear", () => {
     const controller = new GameFlowController(new SeededRandomProvider(20), new MemoryRepository());
 
     let state = controller.createInitialState();
@@ -25,36 +25,68 @@ describe("GameFlowController", () => {
 
     state = controller.startRun();
     expect(state.scene).toBe("nodeMap");
+    expect(state.run?.progress.currentFloor).toBe(1);
 
-    state = controller.enterNode(state, "node_1b");
+    state = controller.enterNode(state, "floor_2");
+    expect(state.scene).toBe("nodeMap");
+
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
     expect(state.scene).toBe("combat");
 
     state = defeatEnemyWithTetrises(controller, state);
     expect(state.scene).toBe("reward");
+    expect(state.combat?.lastClearResult?.displayName).toBe("Tetris");
+    expect(state.combat?.lastFeedbackEvent?.clearName).toBe("Tetris");
+    expect(state.combat?.lastFeedbackEvent?.intensity).toBe("high");
+    expect(state.events.some((event) => event.type === "CombatFeedback")).toBe(true);
 
     const rewardId = state.reward?.choices[0].id;
     if (!rewardId) throw new Error("Expected reward choices");
     state = controller.selectReward(state, rewardId);
     expect(state.scene).toBe("nodeMap");
+    expect(state.run?.progress.currentFloor).toBe(2);
 
-    state = controller.enterNode(state, "node_2b");
-    state = defeatEnemyWithTetrises(controller, state);
-    const secondRewardId = state.reward?.choices[0].id;
-    if (!secondRewardId) throw new Error("Expected second reward choices");
-    state = controller.selectReward(state, secondRewardId);
-
-    state = controller.enterNode(state, "node_elite");
-    state = defeatEnemyWithTetrises(controller, state);
-    const eliteRewardId = state.reward?.choices[0].id;
-    if (!eliteRewardId) throw new Error("Expected elite reward choices");
-    state = controller.selectReward(state, eliteRewardId);
-
-    state = controller.enterNode(state, "node_boss");
+    state = {
+      ...state,
+      run: state.run
+        ? {
+            ...state.run,
+            currentNodeId: "floor_30",
+            progress: { ...state.run.progress, currentFloor: 30 },
+          }
+        : state.run,
+    };
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
     state = defeatEnemyWithTetrises(controller, state);
 
     expect(state.scene).toBe("runResult");
     expect(state.runResult?.result).toBe("victory");
-    expect(state.run?.relicInventory.relics.length).toBeGreaterThanOrEqual(3);
+    expect(state.run?.relicInventory.relics.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("enters a shop floor and leaves to the next floor", () => {
+    const controller = new GameFlowController(new SeededRandomProvider(21), new MemoryRepository());
+    let state = controller.startRun();
+    state = {
+      ...state,
+      run: state.run
+        ? {
+            ...state.run,
+            currentNodeId: "floor_4",
+            progress: { ...state.run.progress, currentFloor: 4 },
+          }
+        : state.run,
+    };
+
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
+
+    expect(state.scene).toBe("shop");
+    expect(state.reward?.choices).toHaveLength(3);
+
+    state = controller.completeCurrentNode(state);
+
+    expect(state.scene).toBe("nodeMap");
+    expect(state.run?.progress.currentFloor).toBe(5);
   });
 });
 

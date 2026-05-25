@@ -9,6 +9,7 @@ export type TetrisRuleSet = {
   lockDelayMs: number;
   maxLockResets: number;
   ghostPieceEnabled: boolean;
+  keepBackToBackOnEmptyTSpin: boolean;
 };
 
 export const standardRuleSet: TetrisRuleSet = {
@@ -22,4 +23,5 @@ export const standardRuleSet: TetrisRuleSet = {
   lockDelayMs: 500,
   maxLockResets: 15,
   ghostPieceEnabled: true,
+  keepBackToBackOnEmptyTSpin: true,
 };

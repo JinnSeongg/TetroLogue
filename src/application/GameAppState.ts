@@ -4,7 +4,7 @@ import type { RunState } from "../domain/run/RunState";
 import type { GameEvent } from "../domain/shared/GameEvent";
 import type { InputBuffer } from "./input/InputBuffer";
 
-export type SceneState = "mainMenu" | "nodeMap" | "combat" | "reward" | "runResult";
+export type SceneState = "mainMenu" | "nodeMap" | "combat" | "reward" | "shop" | "runResult";
 
 export type RunResultState = {
   result: "victory" | "defeat";

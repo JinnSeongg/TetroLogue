@@ -6,7 +6,9 @@ export type StageNode = {
   id: Id;
   type: NodeType;
   label: string;
+  floor?: number;
   enemyId?: Id;
+  bossId?: Id;
   nextNodeIds: Id[];
   completed: boolean;
 };

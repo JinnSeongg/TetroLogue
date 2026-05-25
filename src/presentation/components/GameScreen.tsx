@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameAppState, PlayerInput } from "../../application/GameAppState";
 import type { BrowserInputAdapter } from "../../infrastructure/BrowserInputAdapter";
 import { relicDefinitions } from "../../data/relicDefinitions";
@@ -10,10 +10,12 @@ import { MovementRepeater } from "../../application/input/MovementRepeater";
 import { BrowserKeyboardStateAdapter } from "../../infrastructure/BrowserKeyboardStateAdapter";
 import { CombatScreen } from "./CombatScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
-import { NodeMapView } from "./NodeMapView";
-import { RelicPanel } from "./RelicPanel";
 import { RewardScreen } from "./RewardScreen";
 import { RunResultScreen } from "./RunResultScreen";
+import { SettingsPanel } from "./SettingsPanel";
+import { RunProgressScreen } from "./RunProgressScreen";
+import { ShopScreen } from "./ShopScreen";
+import { AudioService, soundKeyForUiElement } from "../services/AudioService";
 
 type Props = {
   state: GameAppState;
@@ -25,6 +27,7 @@ type Props = {
   onDebugLineClear: (lines: number) => void;
   onSelectReward: (rewardId: string) => void;
   onMoveToNode: (nodeId: string) => void;
+  onCompleteCurrentNode: () => void;
   onReturnToMenu: () => void;
   devMode: boolean;
   settings: PlayerSettings;
@@ -34,14 +37,50 @@ type Props = {
 export function GameScreen(props: Props) {
   const inputStateRef = useRef<InputState>(createInputState());
   const propsRef = useRef(props);
+  const audioServiceRef = useRef(new AudioService());
+  const lastAudioEventCountRef = useRef(props.state.events.length);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   propsRef.current = props;
 
   useEffect(() => {
+    audioServiceRef.current.setVolumes({
+      master: props.settings.audio.masterVolume / 100,
+      sfx: props.settings.audio.sfxVolume / 100,
+      ui: props.settings.audio.uiVolume / 100,
+      music: props.settings.audio.musicVolume / 100,
+    });
+  }, [props.settings.audio]);
+
+  useEffect(() => {
+    const startIndex = Math.min(lastAudioEventCountRef.current, props.state.events.length);
+    const newEvents = props.state.events.slice(startIndex);
+    for (const event of newEvents) {
+      audioServiceRef.current.playGameEvent(event);
+      if (event.type === "CombatFeedback") audioServiceRef.current.playCombatFeedback(event.feedback);
+    }
+    lastAudioEventCountRef.current = props.state.events.length;
+  }, [props.state.events]);
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Element)) return;
+      const interactive = event.target.closest("button, .reward-card");
+      if (interactive) audioServiceRef.current.play(soundKeyForUiElement(interactive));
+    };
+    window.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("click", onClick);
+    };
+  }, []);
+
+  useEffect(() => {
     if (props.state.scene !== "combat") return;
-    const keyboardStateAdapter = new BrowserKeyboardStateAdapter(props.inputAdapter);
+    const keyboardStateAdapter = new BrowserKeyboardStateAdapter(props.inputAdapter, props.settings);
     const onDown = (event: KeyboardEvent) => {
-      if (!propsRef.current.inputAdapter.mapKey(event.key)) return;
+      const mappedInput = propsRef.current.inputAdapter.mapKey(event.key, propsRef.current.settings);
+      if (!mappedInput) return;
       const nowMs = performance.now();
+      const wasSoftDropPressed = inputStateRef.current.softDropPressed;
       const result = keyboardStateAdapter.apply(
         inputStateRef.current,
         { type: "keydown", key: event.key, repeat: event.repeat },
@@ -50,10 +89,16 @@ export function GameScreen(props: Props) {
       event.preventDefault();
       if (result.inputState === inputStateRef.current && !result.immediateInput) return;
       inputStateRef.current = result.inputState;
-      if (result.immediateInput) propsRef.current.onInput(result.immediateInput, nowMs, true, initialActionFromInputState(inputStateRef.current));
+      if (mappedInput === "softDrop" && !event.repeat && !wasSoftDropPressed && inputStateRef.current.softDropPressed) {
+        audioServiceRef.current.play("softDrop");
+      }
+      if (result.immediateInput) {
+        audioServiceRef.current.playInput(result.immediateInput);
+        propsRef.current.onInput(result.immediateInput, nowMs, true, initialActionFromInputState(inputStateRef.current));
+      }
     };
     const onUp = (event: KeyboardEvent) => {
-      if (!propsRef.current.inputAdapter.mapKey(event.key)) return;
+      if (!propsRef.current.inputAdapter.mapKey(event.key, propsRef.current.settings)) return;
       const result = keyboardStateAdapter.apply(inputStateRef.current, { type: "keyup", key: event.key }, performance.now());
       event.preventDefault();
       if (result.inputState === inputStateRef.current) return;
@@ -70,7 +115,9 @@ export function GameScreen(props: Props) {
       const repeat = repeater.next(inputStateRef.current, time, propsRef.current.settings);
       inputStateRef.current = repeat.inputState;
       for (const direction of repeat.moves) {
-        propsRef.current.onInput(direction === "left" ? "moveLeft" : "moveRight", time, false, initialActionFromInputState(inputStateRef.current));
+        const input = direction === "left" ? "moveLeft" : "moveRight";
+        audioServiceRef.current.playInput(input);
+        propsRef.current.onInput(input, time, false, initialActionFromInputState(inputStateRef.current));
       }
       propsRef.current.onTickCombat(deltaMs, inputStateRef.current.softDropPressed, time, initialActionFromInputState(inputStateRef.current));
       frameId = requestAnimationFrame(frame);
@@ -82,15 +129,23 @@ export function GameScreen(props: Props) {
       window.removeEventListener("keyup", onUp);
       inputStateRef.current = createInputState();
     };
-  }, [props.state.scene, props.inputAdapter]);
+  }, [props.state.scene, props.inputAdapter, props.settings]);
+
+  const settingsModal = settingsOpen ? (
+    <SettingsPanel settings={props.settings} onChange={props.onSettingsChange} onClose={() => setSettingsOpen(false)} />
+  ) : null;
 
   if (props.state.scene === "mainMenu") {
     return (
-      <MainMenuScreen
-        canContinue={props.state.canContinue ?? false}
-        onStartRun={props.onStartRun}
-        onContinueRun={props.onContinueRun}
-      />
+      <>
+        <MainMenuScreen
+          canContinue={props.state.canContinue ?? false}
+          onStartRun={props.onStartRun}
+          onContinueRun={props.onContinueRun}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        {settingsModal}
+      </>
     );
   }
 
@@ -98,18 +153,29 @@ export function GameScreen(props: Props) {
     return (
       <CombatScreen
         state={props.state}
-        onInput={props.onInput}
         onDebugLineClear={props.onDebugLineClear}
         onReturnToMenu={props.onReturnToMenu}
         devMode={props.devMode}
         settings={props.settings}
-        onSettingsChange={props.onSettingsChange}
       />
     );
   }
 
   if (props.state.scene === "reward" && props.state.reward) {
-    return <RewardScreen reward={props.state.reward} relics={relicDefinitions} onSelect={props.onSelectReward} />;
+    const isEvent = props.state.run?.status === "event";
+    return (
+      <RewardScreen
+        reward={props.state.reward}
+        relics={relicDefinitions}
+        onSelect={props.onSelectReward}
+        eyebrow={isEvent ? "Event" : "Battle Reward"}
+        title={isEvent ? "Choose a Relic" : "Choose a Relic"}
+      />
+    );
+  }
+
+  if (props.state.scene === "shop") {
+    return <ShopScreen reward={props.state.reward} relics={relicDefinitions} onSelect={props.onSelectReward} onLeave={props.onCompleteCurrentNode} />;
   }
 
   if (props.state.scene === "runResult") {
@@ -117,19 +183,14 @@ export function GameScreen(props: Props) {
   }
 
   return (
-    <main className="app-shell map-shell">
-      <header className="top-bar">
-        <div>
-          <p className="eyebrow">Run Map</p>
-          <h1>TetroLogue</h1>
-          <p>Pick a connected node, win the battle, then claim a relic.</p>
-        </div>
-        <button onClick={props.onReturnToMenu}>Menu</button>
-      </header>
-      <section className="map-layout">
-        <NodeMapView run={props.state.run} onMoveToNode={props.onMoveToNode} />
-        <RelicPanel inventory={props.state.run?.relicInventory} />
-      </section>
-    </main>
+    <>
+      <RunProgressScreen
+        run={props.state.run}
+        onEnterNode={props.onMoveToNode}
+        onReturnToMenu={props.onReturnToMenu}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      {settingsModal}
+    </>
   );
 }

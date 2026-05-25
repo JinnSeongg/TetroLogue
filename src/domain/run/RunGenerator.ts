@@ -1,6 +1,48 @@
 import type { NodeMap } from "./NodeMap";
+import type { FloorNode } from "./RunProgressState";
+import { generateRunNodes } from "./RunProgression";
 
 export class RunGenerator {
+  generate(): NodeMap {
+    return createNodeMapFromFloorNodes(generateRunNodes());
+  }
+}
+
+export function createNodeMapFromFloorNodes(nodes: FloorNode[]): NodeMap {
+  return {
+    nodes: nodes.map((node, index) => {
+      const next = nodes[index + 1];
+      const id = floorNodeId(node.floor);
+      return {
+        id,
+        floor: node.floor,
+        type: toStageNodeType(node.type),
+        label: floorNodeLabel(node),
+        enemyId: node.enemyPoolId ?? node.bossId,
+        bossId: node.bossId,
+        nextNodeIds: next ? [floorNodeId(next.floor)] : [],
+        completed: false,
+      };
+    }),
+  };
+}
+
+export function floorNodeId(floor: number): string {
+  return `floor_${floor}`;
+}
+
+function toStageNodeType(type: FloorNode["type"]) {
+  if (type === "battle") return "combat";
+  if (type === "finalBoss") return "boss";
+  return type;
+}
+
+function floorNodeLabel(node: FloorNode): string {
+  if (node.type === "finalBoss") return "Final Boss";
+  return `${node.type[0].toUpperCase()}${node.type.slice(1)} ${node.floor}`;
+}
+
+export class LegacyRunGenerator {
   generate(): NodeMap {
     return {
       nodes: [

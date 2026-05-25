@@ -9,6 +9,9 @@ import type { EnemyIntent } from "../enemy/EnemyIntent";
 import type { GameEvent } from "../shared/GameEvent";
 import type { LastSpinAction, SpinResult } from "../tetris/SpinDetector";
 import type { GarbageQueue } from "./GarbageQueue";
+import type { ClearResult } from "../tetris/ClearResult";
+import type { ComboB2BResult } from "./ComboB2BTracker";
+import type { CombatFeedbackEvent } from "./CombatFeedbackEvent";
 
 export type PlayerCombatState = {
   hp: number;
@@ -20,7 +23,9 @@ export type PlayerCombatState = {
   hold?: TetrominoType;
   relicInventory: RelicInventory;
   combo: number;
+  comboDisplayCount: number;
   backToBackActive: boolean;
+  backToBackCount: number;
   actionCount: number;
   gravityElapsedMs: number;
   lockElapsedMs: number;
@@ -49,5 +54,8 @@ export type CombatState = {
   lastBaseAttack?: number;
   lastLinesCleared?: number;
   lastSpinResult?: SpinResult;
+  lastClearResult?: ClearResult;
+  lastComboB2BResult?: ComboB2BResult;
+  lastFeedbackEvent?: CombatFeedbackEvent;
   log: GameEvent[];
 };

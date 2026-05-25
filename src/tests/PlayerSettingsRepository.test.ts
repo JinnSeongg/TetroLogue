@@ -22,6 +22,7 @@ describe("LocalStoragePlayerSettingsRepository", () => {
       input: {
         dasMs: 180,
         arrMs: 30,
+        softDropGravityMs: 18,
         keyBindings: {
           moveLeft: ["ArrowLeft"],
           moveRight: ["ArrowRight"],
@@ -34,12 +35,17 @@ describe("LocalStoragePlayerSettingsRepository", () => {
         },
       },
       accessibility: {},
-      video: {},
-      audio: {},
+      video: { screenShakeEnabled: false, ghostPieceEnabled: false, gridVisible: false },
+      audio: { masterVolume: 50, bgmVolume: 40, sfxVolume: 30, uiVolume: 20, musicVolume: 10 },
     });
 
     expect(repository.load().input.dasMs).toBe(180);
     expect(repository.load().input.arrMs).toBe(30);
+    expect(repository.load().input.softDropGravityMs).toBe(18);
+    expect(repository.load().video.ghostPieceEnabled).toBe(false);
+    expect(repository.load().audio.masterVolume).toBe(50);
+    expect(repository.load().audio.uiVolume).toBe(20);
+    expect(repository.load().audio.musicVolume).toBe(10);
   });
 
   it("falls back and clamps invalid values", () => {
@@ -52,7 +58,17 @@ describe("LocalStoragePlayerSettingsRepository", () => {
     expect(loaded.input.arrMs).toBe(120);
   });
 
-  it("does not persist gameplay rule values such as softDropGravityMs as player settings", () => {
+  it("migrates legacy BGM volume into music volume", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("settings", JSON.stringify({ version: 1, settings: { audio: { bgmVolume: 35 } } }));
+
+    const loaded = new LocalStoragePlayerSettingsRepository("settings", storage).load();
+
+    expect(loaded.audio.bgmVolume).toBe(35);
+    expect(loaded.audio.musicVolume).toBe(35);
+  });
+
+  it("persists softDropGravityMs as a player setting", () => {
     const storage = new MemoryStorage();
     storage.setItem(
       "settings",
@@ -63,6 +79,6 @@ describe("LocalStoragePlayerSettingsRepository", () => {
 
     expect(loaded.input.dasMs).toBe(160);
     expect(loaded.input.arrMs).toBe(35);
-    expect("softDropGravityMs" in loaded.input).toBe(false);
+    expect(loaded.input.softDropGravityMs).toBe(1);
   });
 });

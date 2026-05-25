@@ -5,12 +5,14 @@ import { createBaseAttackResult } from "../combat/attack/AttackResultFactory";
 import { LineClearDetector } from "./LineClearDetector";
 import { PerfectClearDetector } from "./PerfectClearDetector";
 import { SrsSpinDetector, type LastSpinAction, type SpinResult } from "./SpinDetector";
+import { createClearResult, type ClearResult } from "./ClearResult";
 
 export type LockResult = {
   board: Board;
   linesCleared: number;
   clearedRows: number[];
   spinResult: SpinResult;
+  clearResult: ClearResult;
   attackResult?: AttackResult;
 };
 
@@ -25,11 +27,18 @@ export class LockSystem {
     const spinResult = this.spinDetector.detect(board, piece, lastSpinAction);
     const placed = board.place(piece);
     const lineClearResult = this.lineClearDetector.detectAndClear(placed);
+    const isPerfectClear = this.perfectClearDetector.isPerfectClear(lineClearResult.board);
+    const clearResult = createClearResult({
+      linesCleared: lineClearResult.linesCleared,
+      clearedRows: lineClearResult.clearedRows,
+      spinResult,
+      isPerfectClear,
+    });
     const attackResult = createBaseAttackResult({
       lineClearCount: lineClearResult.linesCleared,
       spinResult,
-      isPerfectClear: this.perfectClearDetector.isPerfectClear(lineClearResult.board),
+      isPerfectClear,
     });
-    return { ...lineClearResult, spinResult, attackResult };
+    return { ...lineClearResult, spinResult, clearResult, attackResult };
   }
 }

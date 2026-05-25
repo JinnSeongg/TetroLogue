@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { StartRunUseCase } from "../application/StartRunUseCase";
-import { MoveToNextNodeUseCase } from "../application/MoveToNextNodeUseCase";
 import { StartCombatUseCase } from "../application/StartCombatUseCase";
 import { ResolveLineClearUseCase } from "../application/ResolveLineClearUseCase";
 import { DamageResolver } from "../domain/combat/DamageResolver";
@@ -10,10 +9,18 @@ import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
 describe("Enemy pattern", () => {
   it("creates an enemy intent on the configured action interval", () => {
     const random = new SeededRandomProvider(15);
-    const run = new StartRunUseCase().execute();
-    const node1 = new MoveToNextNodeUseCase().execute(run, "node_1a");
-    const node2 = new MoveToNextNodeUseCase().execute(node1, "node_2a");
-    const started = new StartCombatUseCase(random).execute(node2);
+    const run = new StartRunUseCase(new SeededRandomProvider(15)).execute();
+    const floor2 = {
+      ...run,
+      run: run.run
+        ? {
+            ...run.run,
+            currentNodeId: "floor_2",
+            progress: { ...run.run.progress, currentFloor: 2 },
+          }
+        : run.run,
+    };
+    const started = new StartCombatUseCase(random).execute(floor2);
     const action1 = new ResolveLineClearUseCase(random).execute(started, 0);
     const action2 = new ResolveLineClearUseCase(random).execute(action1, 0);
     const action3 = new ResolveLineClearUseCase(random).execute(action2, 0);

@@ -11,9 +11,15 @@ import type { RelicInstance } from "../domain/relic/RelicInstance";
 import type { GameEvent } from "../domain/shared/GameEvent";
 import type { RewardDefinition } from "../domain/reward/RewardDefinition";
 import type { NodeMap } from "../domain/run/NodeMap";
+import type { RunProgressState } from "../domain/run/RunProgressState";
+import { createRunProgressState, generateRunNodes } from "../domain/run/RunProgression";
+import { createNodeMapFromFloorNodes, floorNodeId } from "../domain/run/RunGenerator";
 import { normalizeRotationState, type RotationState } from "../domain/tetris/rotation/RotationState";
 import { garbageConfig } from "../domain/combat/GarbageConfig";
 import { GarbageQueue, type GarbagePacket } from "../domain/combat/GarbageQueue";
+import type { ClearResult } from "../domain/tetris/ClearResult";
+import type { ComboB2BResult } from "../domain/combat/ComboB2BTracker";
+import type { CombatFeedbackEvent } from "../domain/combat/CombatFeedbackEvent";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -24,8 +30,9 @@ type SavedGameStateV1 = {
     id: string;
     nodeMap: NodeMap;
     currentNodeId: string;
+    progress?: RunProgressState;
     relics: RelicInstance[];
-    status: "map" | "combat" | "reward" | "complete";
+    status: "map" | "combat" | "event" | "shop" | "reward" | "complete";
   };
   combat?: {
     player: {
@@ -37,7 +44,9 @@ type SavedGameStateV1 = {
       hold?: TetrominoType;
       holdUsedThisTurn: boolean;
       combo: number;
+      comboDisplayCount?: number;
       backToBackActive: boolean;
+      backToBackCount?: number;
       actionCount: number;
       gravityElapsedMs: number;
       lockElapsedMs: number;
@@ -64,6 +73,9 @@ type SavedGameStateV1 = {
     lastAttack?: number;
     lastBaseAttack?: number;
     lastLinesCleared?: number;
+    lastClearResult?: ClearResult;
+    lastComboB2BResult?: ComboB2BResult;
+    lastFeedbackEvent?: CombatFeedbackEvent;
     log: GameEvent[];
   };
   reward?: {
@@ -87,6 +99,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             id: state.run.id,
             nodeMap: state.run.nodeMap,
             currentNodeId: state.run.currentNodeId,
+            progress: state.run.progress,
             relics: state.run.relicInventory.relics,
             status: state.run.status,
           }
@@ -108,7 +121,9 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               hold: state.combat.player.holdSlot.held,
               holdUsedThisTurn: state.combat.player.holdSlot.usedThisTurn,
               combo: state.combat.player.combo,
+              comboDisplayCount: state.combat.player.comboDisplayCount,
               backToBackActive: state.combat.player.backToBackActive,
+              backToBackCount: state.combat.player.backToBackCount,
               actionCount: state.combat.player.actionCount,
               gravityElapsedMs: state.combat.player.gravityElapsedMs,
               lockElapsedMs: state.combat.player.lockElapsedMs,
@@ -130,6 +145,9 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             lastAttack: state.combat.lastAttack,
             lastBaseAttack: state.combat.lastBaseAttack,
             lastLinesCleared: state.combat.lastLinesCleared,
+            lastClearResult: state.combat.lastClearResult,
+            lastComboB2BResult: state.combat.lastComboB2BResult,
+            lastFeedbackEvent: state.combat.lastFeedbackEvent,
             log: state.combat.log.slice(-50),
           }
         : undefined,
@@ -145,11 +163,13 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
     const parsed = parseSavedState(raw);
     if (!parsed || parsed.version !== 1) return undefined;
 
+    const progress = parsed.run?.progress ?? createRunProgressState(generateRunNodes());
     const run = parsed.run
       ? {
           id: parsed.run.id,
-          nodeMap: parsed.run.nodeMap,
-          currentNodeId: parsed.run.currentNodeId,
+          nodeMap: parsed.run.progress ? parsed.run.nodeMap : createNodeMapFromFloorNodes(progress.nodes),
+          currentNodeId: parsed.run.progress ? parsed.run.currentNodeId : floorNodeId(progress.currentFloor),
+          progress,
           relicInventory: new RelicInventory(validateRelics(parsed.run.relics), relicDefinitions),
           status: parsed.run.status,
         }
@@ -177,7 +197,9 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               holdSlot: new HoldSlot(parsed.combat.player.hold, parsed.combat.player.holdUsedThisTurn),
               relicInventory: run.relicInventory,
               combo: parsed.combat.player.combo,
+              comboDisplayCount: parsed.combat.player.comboDisplayCount ?? Math.max(0, parsed.combat.player.combo - 1),
               backToBackActive: parsed.combat.player.backToBackActive,
+              backToBackCount: parsed.combat.player.backToBackCount ?? (parsed.combat.player.backToBackActive ? 1 : 0),
               actionCount: parsed.combat.player.actionCount,
               gravityElapsedMs: parsed.combat.player.gravityElapsedMs ?? 0,
               lockElapsedMs: parsed.combat.player.lockElapsedMs ?? 0,
@@ -212,6 +234,9 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             lastAttack: parsed.combat.lastAttack,
             lastBaseAttack: parsed.combat.lastBaseAttack,
             lastLinesCleared: parsed.combat.lastLinesCleared,
+            lastClearResult: parsed.combat.lastClearResult,
+            lastComboB2BResult: parsed.combat.lastComboB2BResult,
+            lastFeedbackEvent: parsed.combat.lastFeedbackEvent,
             log: parsed.combat.log,
           }
         : undefined;

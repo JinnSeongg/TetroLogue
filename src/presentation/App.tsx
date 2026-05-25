@@ -11,6 +11,7 @@ import { LoadPlayerSettingsUseCase } from "../application/settings/LoadPlayerSet
 import { SavePlayerSettingsUseCase } from "../application/settings/SavePlayerSettingsUseCase";
 import type { PlayerSettings } from "../application/settings/PlayerSettings";
 import type { InitialActionState } from "../application/input/InitialActionState";
+import { standardRuleSet } from "../domain/tetris/TetrisRuleSet";
 
 export function App() {
   const random = useMemo(() => new BrowserRandomProvider(), []);
@@ -27,13 +28,20 @@ export function App() {
   const handleInput = (input: PlayerInput, nowMs = performance.now(), bufferable = true, initialAction?: InitialActionState) =>
     setState((current) => controller.handleInput(current, input, nowMs, bufferable, initialAction));
   const tickCombat = (deltaMs: number, softDropPressed: boolean, nowMs = performance.now(), initialAction?: InitialActionState) =>
-    setState((current) => controller.tickCombat(current, deltaMs, softDropPressed, nowMs, initialAction));
+    setState((current) =>
+      controller.tickCombat(current, deltaMs, softDropPressed, nowMs, initialAction, {
+        ...standardRuleSet,
+        softDropGravityMs: settings.input.softDropGravityMs,
+        ghostPieceEnabled: settings.video.ghostPieceEnabled,
+      }),
+    );
   const saveSettings = (next: PlayerSettings) => {
     setSettings(new SavePlayerSettingsUseCase(settingsRepository).execute(next));
   };
   const debugLineClear = (lines: number) => setState((current) => controller.debugLineClear(current, lines));
   const selectReward = (rewardId: string) => setState((current) => controller.selectReward(current, rewardId));
   const moveToNode = (nodeId: string) => setState((current) => controller.enterNode(current, nodeId));
+  const completeCurrentNode = () => setState((current) => controller.completeCurrentNode(current));
 
   return (
     <GameScreen
@@ -46,6 +54,7 @@ export function App() {
       onDebugLineClear={debugLineClear}
       onSelectReward={selectReward}
       onMoveToNode={moveToNode}
+      onCompleteCurrentNode={completeCurrentNode}
       onReturnToMenu={returnToMenu}
       devMode={devMode}
       settings={settings}

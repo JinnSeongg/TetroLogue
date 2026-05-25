@@ -1,11 +1,13 @@
 import type { SpinResult } from "../tetris/SpinDetector";
 import type { AttackResult } from "../combat/AttackTypes";
+import type { ClearResult } from "../tetris/ClearResult";
+import type { CombatFeedbackEvent } from "../combat/CombatFeedbackEvent";
 
 export type GameEvent =
   | { type: "CombatStarted"; enemyId: string }
   | { type: "PieceSpawned"; pieceType: string }
   | { type: "PiecePlaced"; pieceType: string }
-  | { type: "LineCleared"; lines: number; spinResult?: SpinResult }
+  | { type: "LineCleared"; lines: number; spinResult?: SpinResult; clearResult?: ClearResult }
   | { type: "TetrisCleared" }
   | { type: "SpinDetected"; spinResult: SpinResult }
   | { type: "ComboChanged"; combo: number }
@@ -20,6 +22,7 @@ export type GameEvent =
       actionName?: string;
       lineClearCount?: number;
       spinResult?: SpinResult;
+      clearResult?: ClearResult;
       attackResult?: AttackResult;
     }
   | { type: "EnemyDamaged"; enemyId: string; damage: number; remainingHp: number }
@@ -27,6 +30,7 @@ export type GameEvent =
   | { type: "GarbagePending"; lines: number; dueActionCount: number }
   | { type: "GarbageCanceled"; canceledLines: number; remainingPending: number }
   | { type: "GarbageApplied"; lines: number; holeX: number }
+  | { type: "CombatFeedback"; feedback: CombatFeedbackEvent }
   | { type: "LockResetLimitReached"; count: number }
   | { type: "CombatEnded"; result: "victory" | "defeat" }
   | { type: "RewardOffered"; rewardIds: string[] }

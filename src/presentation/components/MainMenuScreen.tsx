@@ -2,9 +2,10 @@ type Props = {
   canContinue: boolean;
   onStartRun: () => void;
   onContinueRun: () => void;
+  onOpenSettings: () => void;
 };
 
-export function MainMenuScreen({ canContinue, onStartRun, onContinueRun }: Props) {
+export function MainMenuScreen({ canContinue, onStartRun, onContinueRun, onOpenSettings }: Props) {
   return (
     <main className="menu-screen">
       <section className="menu-hero">
@@ -18,6 +19,7 @@ export function MainMenuScreen({ canContinue, onStartRun, onContinueRun }: Props
           <button onClick={onContinueRun} disabled={!canContinue}>
             Continue
           </button>
+          <button onClick={onOpenSettings}>Settings</button>
         </div>
       </section>
     </main>

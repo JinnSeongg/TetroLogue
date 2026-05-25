@@ -6,16 +6,29 @@ import type { RandomProvider } from "../domain/shared/RandomProvider";
 import { relicRewardTable } from "../data/rewardTables";
 import { EnemyPatternSystem } from "../domain/enemy/EnemyPatternSystem";
 import type { GameEvent } from "../domain/shared/GameEvent";
-import { findNode } from "../domain/run/NodeMap";
+import { getCurrentNode } from "../domain/run/RunProgression";
 import { noSpinResult, type SpinResult } from "../domain/tetris/SpinDetector";
 import { GarbageQueue } from "../domain/combat/GarbageQueue";
 import { garbageConfig } from "../domain/combat/GarbageConfig";
 import { GarbageApplier } from "../domain/combat/GarbageApplier";
+import { createClearResult, type ClearResult } from "../domain/tetris/ClearResult";
+import { ComboB2BTracker, type ComboB2BTrackerConfig } from "../domain/combat/ComboB2BTracker";
+import { FieldAnalyzer } from "../domain/combat/field-analysis/FieldAnalyzer";
+import { CombatFeedbackEventFactory } from "../domain/combat/CombatFeedbackEventFactory";
 
 export class ResolveLineClearUseCase {
-  constructor(private readonly random: RandomProvider) {}
+  constructor(
+    private readonly random: RandomProvider,
+    private readonly comboB2BConfig?: ComboB2BTrackerConfig,
+  ) {}
 
-  execute(state: GameAppState, linesCleared: number, spinResult: SpinResult = noSpinResult(), isPerfectClear = false): GameAppState {
+  execute(
+    state: GameAppState,
+    linesCleared: number,
+    spinResult: SpinResult = noSpinResult(),
+    isPerfectClear = false,
+    clearResult: ClearResult = createClearResult({ linesCleared, spinResult, isPerfectClear }),
+  ): GameAppState {
     if (!state.combat || !state.run || state.combat.result !== "ongoing") return state;
     const attack = new AttackCalculator().calculate({
       lineClearCount: linesCleared,
@@ -34,16 +47,31 @@ export class ResolveLineClearUseCase {
     const cancelResult = garbageQueue.cancelWithAttack(attack.totalDamage);
     // Damage order: player attack cancels pending garbage first, then remaining attack is reduced by enemy defense.
     const damage = new DamageResolver().resolve(state.combat.enemy.definition, cancelResult.remainingAttackDamage, linesCleared);
+    const comboB2BResult = new ComboB2BTracker({
+      comboCount: state.combat.player.combo,
+      comboDisplayCount: state.combat.player.comboDisplayCount,
+      isComboActive: state.combat.player.combo > 1,
+      isBackToBack: state.combat.player.backToBackActive,
+      backToBackCount: state.combat.player.backToBackCount,
+    }, this.comboB2BConfig).next(clearResult);
     const nextActionCount = state.combat.player.actionCount + 1;
     garbageQueue.tickDelay();
     const readyPackets = garbageQueue.popReadyPackets();
     const garbageResult = new GarbageApplier().apply(state.combat.player.board, readyPackets, this.random);
     const boardAfterGarbage = garbageResult.appliedLines > 0 ? garbageResult.board : state.combat.player.board;
     const garbageDefeat = garbageResult.appliedLines > 0 && garbageResult.overflow;
+    const dangerState = new FieldAnalyzer().analyze(boardAfterGarbage);
+    const feedbackEvent = new CombatFeedbackEventFactory().create({
+      clearResult,
+      attackResult: attack,
+      comboB2BResult,
+      dangerState,
+      offsetAmount: cancelResult.cancelledGarbage,
+    });
     const nextEnemyHp = Math.max(0, state.combat.enemy.hp - damage);
     const result = nextEnemyHp <= 0 ? "victory" : "ongoing";
-    const currentNode = findNode(state.run.nodeMap, state.run.currentNodeId);
-    const runWon = result === "victory" && currentNode?.type === "boss";
+    const currentNode = getCurrentNode(state.run.progress);
+    const runWon = result === "victory" && currentNode?.type === "finalBoss";
     const canCreateIntent = result === "ongoing" && !garbageDefeat;
     const generatedIntent = canCreateIntent ? new EnemyPatternSystem().nextIntent(state.combat.enemy.definition, nextActionCount) : undefined;
     if (generatedIntent?.garbageLines) {
@@ -55,11 +83,11 @@ export class ResolveLineClearUseCase {
     const reward = finalResult === "victory" && !runWon ? { choices: new RewardGenerator(relicRewardTable, this.random).generate(3) } : state.reward;
     const combatEvents: GameEvent[] = [
       { type: "SpinDetected" as const, spinResult },
-      ...(linesCleared > 0 ? [{ type: "LineCleared" as const, lines: linesCleared, spinResult }] : []),
+      ...(linesCleared > 0 ? [{ type: "LineCleared" as const, lines: linesCleared, spinResult, clearResult }] : []),
       ...(linesCleared === 4 ? [{ type: "TetrisCleared" as const }] : []),
       ...(isPerfectClear ? [{ type: "PerfectClearAchieved" as const }] : []),
-      ...(attack.comboAfter !== state.combat.player.combo ? [{ type: "ComboChanged" as const, combo: attack.comboAfter }] : []),
-      ...(attack.b2bAfter !== state.combat.player.backToBackActive ? [{ type: "BackToBackChanged" as const, active: attack.b2bAfter }] : []),
+      ...(comboB2BResult.comboCount !== state.combat.player.combo ? [{ type: "ComboChanged" as const, combo: comboB2BResult.comboCount }] : []),
+      ...(comboB2BResult.isBackToBack !== state.combat.player.backToBackActive ? [{ type: "BackToBackChanged" as const, active: comboB2BResult.isBackToBack }] : []),
       {
         type: "AttackCalculated",
         baseAttack: attack.baseDamage,
@@ -69,6 +97,7 @@ export class ResolveLineClearUseCase {
         actionName: attack.actionName,
         lineClearCount: linesCleared,
         spinResult,
+        clearResult,
         attackResult: attack,
       },
       ...(cancelResult.cancelledGarbage > 0
@@ -80,6 +109,7 @@ export class ResolveLineClearUseCase {
         lines: packet.amount,
         holeX: garbageResult.holes[index] ?? 0,
       })),
+      { type: "CombatFeedback" as const, feedback: feedbackEvent },
       ...(generatedIntent
         ? [
             {
@@ -113,12 +143,17 @@ export class ResolveLineClearUseCase {
         lastBaseAttack: attack.baseDamage,
         lastLinesCleared: linesCleared,
         lastSpinResult: spinResult,
+        lastClearResult: clearResult,
+        lastComboB2BResult: comboB2BResult,
+        lastFeedbackEvent: feedbackEvent,
         player: {
           ...state.combat.player,
           board: boardAfterGarbage,
           activePiece: boardAfterGarbage.canPlace(state.combat.player.activePiece!) ? state.combat.player.activePiece : undefined,
-          combo: attack.comboAfter,
-          backToBackActive: attack.b2bAfter,
+          combo: comboB2BResult.comboCount,
+          comboDisplayCount: comboB2BResult.comboDisplayCount,
+          backToBackActive: comboB2BResult.isBackToBack,
+          backToBackCount: comboB2BResult.backToBackCount,
           actionCount: nextActionCount,
         },
         log: [...state.combat.log, ...combatEvents],

@@ -1,6 +1,7 @@
 import type { PlayerInput } from "../application/GameAppState";
 import type { InputState } from "../application/input/InputState";
 import { pressHorizontal, releaseHorizontal, setHoldPressed, setRotatePressed, setSoftDropPressed } from "../application/input/InputState";
+import { defaultPlayerSettings, type PlayerSettings } from "../application/settings/PlayerSettings";
 import { BrowserInputAdapter, type BrowserControlInput } from "./BrowserInputAdapter";
 
 export type BrowserKeyboardStateEvent = {
@@ -15,10 +16,13 @@ export type BrowserKeyboardStateResult = {
 };
 
 export class BrowserKeyboardStateAdapter {
-  constructor(private readonly inputAdapter = new BrowserInputAdapter()) {}
+  constructor(
+    private readonly inputAdapter = new BrowserInputAdapter(),
+    private readonly settings: PlayerSettings = defaultPlayerSettings,
+  ) {}
 
   apply(inputState: InputState, event: BrowserKeyboardStateEvent, nowMs: number): BrowserKeyboardStateResult {
-    const input = this.inputAdapter.mapKey(event.key);
+    const input = this.inputAdapter.mapKey(event.key, this.settings);
     if (!input) return { inputState };
     if (event.type === "keydown" && event.repeat) return { inputState };
 

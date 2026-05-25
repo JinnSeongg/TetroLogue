@@ -1,17 +1,19 @@
 import type { PlayerInput } from "../application/GameAppState";
+import { defaultPlayerSettings, type PlayerSettings } from "../application/settings/PlayerSettings";
 
 export type BrowserControlInput = PlayerInput | "softDrop";
 
 export class BrowserInputAdapter {
-  mapKey(key: string): BrowserControlInput | undefined {
-    if (key === "ArrowLeft") return "moveLeft";
-    if (key === "ArrowRight") return "moveRight";
-    if (key === "ArrowDown") return "softDrop";
-    if (key === "ArrowUp" || key.toLowerCase() === "x") return "rotateClockwise";
-    if (key === "Control" || key.toLowerCase() === "z") return "rotateCounterClockwise";
-    if (key.toLowerCase() === "a") return "rotate180";
-    if (key === " ") return "hardDrop";
-    if (key === "Shift" || key.toLowerCase() === "c") return "hold";
+  mapKey(key: string, settings: PlayerSettings = defaultPlayerSettings): BrowserControlInput | undefined {
+    const normalized = normalizeKey(key);
+    const bindings = settings.input.keyBindings;
+    for (const action of Object.keys(bindings) as BrowserControlInput[]) {
+      if (bindings[action].some((boundKey) => normalizeKey(boundKey) === normalized)) return action;
+    }
     return undefined;
   }
+}
+
+export function normalizeKey(key: string): string {
+  return key.length === 1 ? key.toLowerCase() : key;
 }
