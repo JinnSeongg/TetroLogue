@@ -1,7 +1,8 @@
 import type { SoundDefinition, SoundEventKey } from "./AudioService";
 
-const sfx = "/assets/audio/sfx";
-const ui = "/assets/audio/ui";
+const publicBase = import.meta.env.BASE_URL.replace(/\/$/, "");
+const sfx = `${publicBase}/assets/audio/sfx`;
+const ui = `${publicBase}/assets/audio/ui`;
 
 export const audioRegistry: Record<SoundEventKey, SoundDefinition> = {
   move: { src: `${sfx}/piece-move-2.mp3`, group: "sfx", minIntervalMs: 60, maxConcurrent: 1 },
