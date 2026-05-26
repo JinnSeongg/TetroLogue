@@ -83,6 +83,9 @@ describe("AudioService", () => {
   });
 
   it("maps game lifecycle events to safe UI or SFX sounds", () => {
+    expect(soundKeyForGameEvent({ type: "PlayerActionSucceeded", action: "move" })).toBe("move");
+    expect(soundKeyForGameEvent({ type: "PlayerActionSucceeded", action: "rotate" })).toBe("rotate");
+    expect(soundKeyForGameEvent({ type: "PlayerActionSucceeded", action: "softDrop" })).toBe("softDrop");
     expect(soundKeyForGameEvent({ type: "PiecePlaced", pieceType: "T" })).toBe("lock");
     expect(soundKeyForGameEvent({ type: "GarbagePending", lines: 3, dueActionCount: 2 })).toBe("garbageIncoming");
     expect(soundKeyForGameEvent({ type: "GarbageApplied", lines: 2, holeX: 4 })).toBe("danger");

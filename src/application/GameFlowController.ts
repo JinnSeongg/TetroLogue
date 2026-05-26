@@ -17,6 +17,7 @@ import { getCurrentNode } from "../domain/run/RunProgression";
 import { RewardGenerator } from "../domain/reward/RewardGenerator";
 import { relicRewardTable, shopRelicRewardTable } from "../data/rewardTables";
 import { CompleteCurrentNodeUseCase } from "./CompleteCurrentNodeUseCase";
+import type { DifficultyId } from "../domain/balance/balanceTypes";
 
 export class GameFlowController {
   constructor(
@@ -32,8 +33,16 @@ export class GameFlowController {
     };
   }
 
-  startRun(): GameAppState {
-    const state = new StartRunUseCase(this.random).execute();
+  showDifficultySelect(): GameAppState {
+    return {
+      scene: "difficultySelect",
+      canContinue: new LoadRunUseCase(this.repository).execute() !== undefined,
+      events: [],
+    };
+  }
+
+  startRun(difficultyId: DifficultyId = "standard"): GameAppState {
+    const state = new StartRunUseCase(this.random).execute(difficultyId);
     this.save(state);
     return state;
   }
@@ -68,13 +77,13 @@ export class GameFlowController {
             ...entered,
             scene: "reward" as const,
             run: { ...state.run, status: "event" as const },
-            reward: { choices: new RewardGenerator(relicRewardTable, this.random).generate(3) },
+            reward: { choices: new RewardGenerator(relicRewardTable, this.random).generate(3, state.run.relicInventory) },
           }
         : {
             ...entered,
             scene: "shop" as const,
             run: { ...state.run, status: "shop" as const },
-            reward: { choices: new RewardGenerator(shopRelicRewardTable, this.random).generate(3) },
+            reward: { choices: new RewardGenerator(shopRelicRewardTable, this.random).generate(3, state.run.relicInventory) },
           };
     this.save(next);
     return next;
@@ -87,9 +96,10 @@ export class GameFlowController {
   }
 
   handleInput(state: GameAppState, input: PlayerInput, nowMs = 0, bufferable = true, initialAction?: InitialActionState): GameAppState {
-    const result = new HandlePlayerInputUseCase(this.random).executeWithResult(state, input, nowMs, initialAction);
+    const ruleSet = state.combat?.ruleSet ?? standardRuleSet;
+    const result = new HandlePlayerInputUseCase(this.random, ruleSet).executeWithResult(state, input, nowMs, initialAction);
     const next =
-      result.executed || !bufferable || !canBufferInput(state, input)
+      result.executed || !bufferable || !canBufferInput(state, input, ruleSet)
         ? result.state
         : { ...state, inputBuffer: enqueueInput(state.inputBuffer ?? createInputBuffer(), input, nowMs) };
     this.save(next);
@@ -99,13 +109,14 @@ export class GameFlowController {
   tickCombat(
     state: GameAppState,
     deltaMs: number,
-    softDropPressed: boolean,
+    softDropSteps: number,
     nowMs = 0,
     initialAction?: InitialActionState,
-    ruleSet: TetrisRuleSet = standardRuleSet,
+    ruleSet?: TetrisRuleSet,
   ): GameAppState {
-    const ticked = new TickCombatUseCase(this.random, ruleSet).execute(state, deltaMs, softDropPressed, nowMs, initialAction);
-    const next = new ProcessBufferedInputUseCase(this.random).execute(ticked, nowMs, initialAction);
+    const currentRuleSet = ruleSet ?? state.combat?.ruleSet ?? standardRuleSet;
+    const ticked = new TickCombatUseCase(this.random, currentRuleSet).execute(state, deltaMs, softDropSteps, nowMs, initialAction);
+    const next = new ProcessBufferedInputUseCase(this.random, currentRuleSet).execute(ticked, nowMs, initialAction);
     if (next !== state) this.save(next);
     return next;
   }

@@ -58,7 +58,9 @@ describe("BrowserKeyboardStateAdapter", () => {
 
     expect(down.immediateInput).toBeUndefined();
     expect(down.inputState.softDropPressed).toBe(true);
+    expect(down.inputState.softDropPressedAt).toBe(0);
     expect(up.inputState.softDropPressed).toBe(false);
+    expect(up.inputState.softDropPressedAt).toBeUndefined();
   });
 
   it("tracks held hold and rotation keys for initial actions", () => {

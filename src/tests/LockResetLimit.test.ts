@@ -47,7 +47,7 @@ describe("lock reset limit", () => {
     const random = new SeededRandomProvider(121);
     const state = groundedState(121);
 
-    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(state, 10, false, 100);
+    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(state, 10, 0, 100);
 
     expect(ticked.combat?.player.isGrounded).toBe(true);
     expect(ticked.combat?.player.groundedSinceMs).toBe(0);
@@ -92,7 +92,7 @@ describe("lock reset limit", () => {
     const random = new SeededRandomProvider(125);
     const state = groundedState(125);
 
-    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(state, 10, true, 100);
+    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(state, 10, 1, 100);
 
     expect(ticked.combat?.player.lockResetCount).toBe(0);
     expect(ticked.combat?.player.lockElapsedMs).toBe(70);
@@ -149,7 +149,7 @@ describe("lock reset limit", () => {
     };
 
     const moved = new HandlePlayerInputUseCase(random, lockRuleSet).executeWithResult(maxed, "moveLeft", 200).state;
-    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(moved, 10, false, 210);
+    const ticked = new TickCombatUseCase(random, lockRuleSet).execute(moved, 10, 0, 210);
 
     expect(ticked.events.some((event) => event.type === "PiecePlaced")).toBe(true);
   });

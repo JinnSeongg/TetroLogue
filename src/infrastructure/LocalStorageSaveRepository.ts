@@ -20,6 +20,10 @@ import { GarbageQueue, type GarbagePacket } from "../domain/combat/GarbageQueue"
 import type { ClearResult } from "../domain/tetris/ClearResult";
 import type { ComboB2BResult } from "../domain/combat/ComboB2BTracker";
 import type { CombatFeedbackEvent } from "../domain/combat/CombatFeedbackEvent";
+import type { DifficultyId, EnemyCalculatedStats } from "../domain/balance/balanceTypes";
+import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
+import { createScaledRuleSet } from "../domain/balance/ruleSetScaler";
+import { createInitialCombatTelemetry, type BattleResultSummary, type CombatTelemetry } from "../domain/combat/BattleResultSummary";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -31,10 +35,13 @@ type SavedGameStateV1 = {
     nodeMap: NodeMap;
     currentNodeId: string;
     progress?: RunProgressState;
+    difficultyId?: DifficultyId;
     relics: RelicInstance[];
     status: "map" | "combat" | "event" | "shop" | "reward" | "complete";
   };
   combat?: {
+    ruleSet?: TetrisRuleSet;
+    telemetry?: CombatTelemetry;
     player: {
       hp: number;
       board: Cell[][];
@@ -42,11 +49,18 @@ type SavedGameStateV1 = {
       pieceQueue?: TetrominoType[];
       nextPieces: TetrominoType[];
       hold?: TetrominoType;
+      holdSlots?: TetrominoType[];
+      maxHoldSlots?: number;
+      hasHeldThisPiece?: boolean;
       holdUsedThisTurn: boolean;
+      holdUsedThisBattle?: boolean;
       combo: number;
       comboDisplayCount?: number;
       backToBackActive: boolean;
       backToBackCount?: number;
+      fastChainCount?: number;
+      isFastState?: boolean;
+      lastPieceLockTimeMs?: number;
       actionCount: number;
       gravityElapsedMs: number;
       lockElapsedMs: number;
@@ -60,6 +74,8 @@ type SavedGameStateV1 = {
     enemy: {
       definitionId: string;
       hp: number;
+      maxHp?: number;
+      calculatedStats?: EnemyCalculatedStats;
       currentIntent?: {
         id: string;
         description: string;
@@ -76,6 +92,7 @@ type SavedGameStateV1 = {
     lastClearResult?: ClearResult;
     lastComboB2BResult?: ComboB2BResult;
     lastFeedbackEvent?: CombatFeedbackEvent;
+    lastBattleResultSummary?: BattleResultSummary;
     log: GameEvent[];
   };
   reward?: {
@@ -100,12 +117,15 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             nodeMap: state.run.nodeMap,
             currentNodeId: state.run.currentNodeId,
             progress: state.run.progress,
+            difficultyId: state.run.difficultyId,
             relics: state.run.relicInventory.relics,
             status: state.run.status,
           }
         : undefined,
       combat: state.combat
         ? {
+            ruleSet: state.combat.ruleSet,
+            telemetry: state.combat.telemetry,
             player: {
               hp: state.combat.player.hp,
               board: state.combat.player.board.snapshot(),
@@ -119,11 +139,18 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               pieceQueue: state.combat.player.pieceQueue,
               nextPieces: state.combat.player.nextPieces,
               hold: state.combat.player.holdSlot.held,
+              holdSlots: state.combat.player.holdSlot.holdSlots,
+              maxHoldSlots: state.combat.player.holdSlot.maxHoldSlots,
+              hasHeldThisPiece: state.combat.player.holdSlot.hasHeldThisPiece,
               holdUsedThisTurn: state.combat.player.holdSlot.usedThisTurn,
+              holdUsedThisBattle: state.combat.player.holdUsedThisBattle,
               combo: state.combat.player.combo,
               comboDisplayCount: state.combat.player.comboDisplayCount,
               backToBackActive: state.combat.player.backToBackActive,
               backToBackCount: state.combat.player.backToBackCount,
+              fastChainCount: state.combat.player.fastChainCount,
+              isFastState: state.combat.player.isFastState,
+              lastPieceLockTimeMs: state.combat.player.lastPieceLockTimeMs,
               actionCount: state.combat.player.actionCount,
               gravityElapsedMs: state.combat.player.gravityElapsedMs,
               lockElapsedMs: state.combat.player.lockElapsedMs,
@@ -137,6 +164,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             enemy: {
               definitionId: state.combat.enemy.definition.id,
               hp: state.combat.enemy.hp,
+              maxHp: state.combat.enemy.maxHp,
+              calculatedStats: state.combat.enemy.calculatedStats,
               currentIntent: state.combat.enemy.currentIntent,
               pendingGarbage: state.combat.enemy.pendingGarbage,
               garbagePackets: state.combat.enemy.garbageQueue.getPackets(),
@@ -148,6 +177,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             lastClearResult: state.combat.lastClearResult,
             lastComboB2BResult: state.combat.lastComboB2BResult,
             lastFeedbackEvent: state.combat.lastFeedbackEvent,
+            lastBattleResultSummary: state.combat.lastBattleResultSummary,
             log: state.combat.log.slice(-50),
           }
         : undefined,
@@ -170,6 +200,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
           nodeMap: parsed.run.progress ? parsed.run.nodeMap : createNodeMapFromFloorNodes(progress.nodes),
           currentNodeId: parsed.run.progress ? parsed.run.currentNodeId : floorNodeId(progress.currentFloor),
           progress,
+          difficultyId: parsed.run.difficultyId ?? "standard",
           relicInventory: new RelicInventory(validateRelics(parsed.run.relics), relicDefinitions),
           status: parsed.run.status,
         }
@@ -178,9 +209,22 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
     const combatEnemyDefinition = parsed.combat ? enemyDefinitions[parsed.combat.enemy.definitionId] : undefined;
     if (parsed.combat && !combatEnemyDefinition) return undefined;
 
+    const combatRuleSet = parsed.combat ? normalizeRuleSet(parsed.combat.ruleSet, parsed.combat.enemy.calculatedStats) : undefined;
+    const loadedHoldSlot =
+      parsed.combat && combatRuleSet
+        ? new HoldSlot(
+            parsed.combat.player.hold,
+            parsed.combat.player.hasHeldThisPiece ?? parsed.combat.player.holdUsedThisTurn,
+            parsed.combat.player.maxHoldSlots ?? combatRuleSet.maxHoldSlots,
+            parsed.combat.player.holdSlots,
+          ).withMaxSlots(combatRuleSet.maxHoldSlots)
+        : undefined;
+
     const combat =
-      parsed.combat && run && combatEnemyDefinition
+          parsed.combat && run && combatEnemyDefinition && combatRuleSet && loadedHoldSlot
         ? {
+            ruleSet: combatRuleSet,
+            telemetry: parsed.combat.telemetry ?? createInitialCombatTelemetry(),
             player: {
               hp: parsed.combat.player.hp,
               board: new Board(parsed.combat.player.board[0]?.length ?? 10, parsed.combat.player.board.length, parsed.combat.player.board),
@@ -193,13 +237,20 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
                 : undefined,
               pieceQueue: parsed.combat.player.pieceQueue ?? parsed.combat.player.nextPieces,
               nextPieces: parsed.combat.player.nextPieces,
-              hold: parsed.combat.player.hold,
-              holdSlot: new HoldSlot(parsed.combat.player.hold, parsed.combat.player.holdUsedThisTurn),
+              hold: loadedHoldSlot.held,
+              holdSlot: loadedHoldSlot,
+              holdSlots: loadedHoldSlot.holdSlots,
+              maxHoldSlots: loadedHoldSlot.maxHoldSlots,
+              hasHeldThisPiece: loadedHoldSlot.hasHeldThisPiece,
+              holdUsedThisBattle: parsed.combat.player.holdUsedThisBattle ?? false,
               relicInventory: run.relicInventory,
               combo: parsed.combat.player.combo,
               comboDisplayCount: parsed.combat.player.comboDisplayCount ?? Math.max(0, parsed.combat.player.combo - 1),
               backToBackActive: parsed.combat.player.backToBackActive,
               backToBackCount: parsed.combat.player.backToBackCount ?? (parsed.combat.player.backToBackActive ? 1 : 0),
+              fastChainCount: parsed.combat.player.fastChainCount ?? 0,
+              isFastState: parsed.combat.player.isFastState ?? false,
+              lastPieceLockTimeMs: parsed.combat.player.lastPieceLockTimeMs,
               actionCount: parsed.combat.player.actionCount,
               gravityElapsedMs: parsed.combat.player.gravityElapsedMs ?? 0,
               lockElapsedMs: parsed.combat.player.lockElapsedMs ?? 0,
@@ -213,10 +264,12 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             enemy: {
               definition: combatEnemyDefinition,
               hp: parsed.combat.enemy.hp,
+              maxHp: parsed.combat.enemy.maxHp ?? combatEnemyDefinition.maxHp,
+              calculatedStats: parsed.combat.enemy.calculatedStats,
               currentIntent: parsed.combat.enemy.currentIntent,
               pendingGarbage: parsed.combat.enemy.pendingGarbage ?? 0,
               garbageQueue: new GarbageQueue(
-                { defaultDelay: garbageConfig.defaultIncomingGarbageDelay },
+                { defaultDelay: parsed.combat.enemy.calculatedStats?.garbageDelayActions ?? garbageConfig.defaultIncomingGarbageDelay },
                 parsed.combat.enemy.garbagePackets ??
                   (parsed.combat.enemy.pendingGarbage
                     ? [
@@ -237,6 +290,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
             lastClearResult: parsed.combat.lastClearResult,
             lastComboB2BResult: parsed.combat.lastComboB2BResult,
             lastFeedbackEvent: parsed.combat.lastFeedbackEvent,
+            lastBattleResultSummary: parsed.combat.lastBattleResultSummary,
             log: parsed.combat.log,
           }
         : undefined;
@@ -270,4 +324,15 @@ function isSavedGameStateV1(value: unknown): value is SavedGameStateV1 {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<SavedGameStateV1>;
   return candidate.version === 1 && typeof candidate.scene === "string" && Array.isArray(candidate.events);
+}
+
+function normalizeRuleSet(ruleSet: TetrisRuleSet | undefined, stats: EnemyCalculatedStats | undefined): TetrisRuleSet {
+  const fallback = stats ? createScaledRuleSet(standardRuleSet, stats) : standardRuleSet;
+  return {
+    ...fallback,
+    ...ruleSet,
+    fastChainWindowMs: ruleSet?.fastChainWindowMs ?? fallback.fastChainWindowMs,
+    fastStateThreshold: ruleSet?.fastStateThreshold ?? fallback.fastStateThreshold,
+    maxHoldSlots: ruleSet?.maxHoldSlots ?? fallback.maxHoldSlots,
+  };
 }

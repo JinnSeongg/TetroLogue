@@ -45,6 +45,9 @@ export type AttackResult = {
   comboBonus: number;
   b2bBonus: number;
   perfectClearBonus: number;
+  relicAttackBonus?: number;
+  preRelicTotalDamage?: number;
+  appliedRelicIds?: string[];
   totalDamage: number;
   comboBefore: number;
   comboAfter: number;

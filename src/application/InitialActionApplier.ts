@@ -1,7 +1,8 @@
 import type { PlayerInput } from "./GameAppState";
 import type { InitialActionState } from "./input/InitialActionState";
 import { initialRotationToPlayerInput } from "./input/InitialActionState";
-import { ActivePiece } from "../domain/tetris/ActivePiece";
+import type { ActivePiece } from "../domain/tetris/ActivePiece";
+import { createEnteredSpawnPiece } from "../domain/tetris/SpawnRules";
 import type { Board } from "../domain/tetris/Board";
 import type { HoldSlot } from "../domain/tetris/HoldSlot";
 import { PieceQueue } from "../domain/tetris/PieceQueue";
@@ -28,6 +29,7 @@ export type InitialActionApplierResult = {
   nextPieces: TetrominoType[];
   lastSpinAction?: LastSpinAction;
   consumedInputs: PlayerInput[];
+  holdUsed: boolean;
 };
 
 export class InitialActionApplier {
@@ -38,19 +40,21 @@ export class InitialActionApplier {
 
   apply(input: InitialActionApplierInput): InitialActionApplierResult {
     let activePiece = input.activePiece;
-    let holdSlot = input.holdSlot;
+    let holdSlot = input.holdSlot.withMaxSlots(this.ruleSet.maxHoldSlots);
     let lastSpinAction: LastSpinAction | undefined;
     const consumedInputs: PlayerInput[] = [];
     const queue = new PieceQueue(this.random, input.pieceQueue);
+    let holdUsed = false;
 
     if (input.initialAction?.holdRequested && this.ruleSet.holdEnabled) {
       const holdResult = holdSlot.hold(activePiece.type);
       if (holdResult.slot !== holdSlot) {
         holdSlot = holdResult.slot;
         const nextPieceType = holdResult.swapped ?? queue.popNext();
-        activePiece = new ActivePiece(nextPieceType, { x: Math.floor(this.ruleSet.boardWidth / 2), y: 0 });
+        activePiece = createEnteredSpawnPiece(nextPieceType, input.board, this.ruleSet);
         lastSpinAction = undefined;
         consumedInputs.push("hold");
+        holdUsed = true;
       }
     }
 
@@ -73,6 +77,7 @@ export class InitialActionApplier {
       nextPieces: queue.peekNext(this.ruleSet.nextPreviewCount),
       lastSpinAction,
       consumedInputs,
+      holdUsed,
     };
   }
 

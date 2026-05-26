@@ -21,14 +21,18 @@ describe("Enemy pattern", () => {
         : run.run,
     };
     const started = new StartCombatUseCase(random).execute(floor2);
-    const action1 = new ResolveLineClearUseCase(random).execute(started, 0);
-    const action2 = new ResolveLineClearUseCase(random).execute(action1, 0);
-    const action3 = new ResolveLineClearUseCase(random).execute(action2, 0);
-    const action4 = new ResolveLineClearUseCase(random).execute(action3, 0);
-    const action5 = new ResolveLineClearUseCase(random).execute(action4, 0);
+    const calculatedStats = started.combat?.enemy.calculatedStats;
+    if (!calculatedStats) throw new Error("Expected calculated enemy stats");
+    let next = started;
+    for (let index = 0; index < calculatedStats.intentEveryActions; index += 1) {
+      next = new ResolveLineClearUseCase(random).execute(next, 0);
+    }
 
-    expect(action5.combat?.enemy.currentIntent?.garbageLines).toBe(1);
-    expect(action5.combat?.log.some((event) => event.type === "EnemyIntentChanged")).toBe(true);
+    expect(next.combat?.enemy.currentIntent?.garbageLines).toBe(calculatedStats.garbageLines);
+    expect(next.combat?.enemy.currentIntent?.dueActionCount).toBe(
+      calculatedStats.intentEveryActions + calculatedStats.garbageDelayActions,
+    );
+    expect(next.combat?.log.some((event) => event.type === "EnemyIntentChanged")).toBe(true);
   });
 
   it("applies defense rules for a specific attack type", () => {

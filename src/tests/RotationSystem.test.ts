@@ -372,6 +372,7 @@ describe("RotationSystem", () => {
     const result = new HandlePlayerInputUseCase(random).executeWithResult(primed, "rotateClockwise", 50);
 
     expect(result.executed).toBe(false);
+    expect(result.state.events.some((event) => event.type === "PlayerActionSucceeded")).toBe(false);
     expect(result.state.combat?.player.lockElapsedMs).toBe(200);
     expect(result.state.combat?.player.lockResetCount).toBe(0);
   });

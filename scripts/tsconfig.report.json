@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": "..",
+    "outDir": "../reports/.report-build",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "../scripts/exportBalanceReport.ts",
+    "../scripts/node-shims.d.ts",
+    "../src/data/**/*.ts",
+    "../src/debug/**/*.ts",
+    "../src/domain/balance/**/*.ts",
+    "../src/domain/enemy/**/*.ts",
+    "../src/domain/shared/**/*.ts"
+  ]
+}

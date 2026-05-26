@@ -167,8 +167,8 @@ describe("spin action lock flow", () => {
       lastSpinAction: tRotation,
     });
 
-    const afterGravity = new TickCombatUseCase(random, ruleSet).execute(state, 1, false, 10);
-    const locked = new TickCombatUseCase(random, ruleSet).execute(afterGravity, 1, false, 11);
+    const afterGravity = new TickCombatUseCase(random, ruleSet).execute(state, 1, 0, 10);
+    const locked = new TickCombatUseCase(random, ruleSet).execute(afterGravity, 1, 0, 11);
 
     expect(afterGravity.combat?.player.lastSpinAction).toEqual(tRotation);
     expect(locked.combat?.lastSpinResult?.kind).toBe("TSpin");

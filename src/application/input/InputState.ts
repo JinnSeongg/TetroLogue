@@ -8,6 +8,8 @@ export type InputState = {
   activeHorizontalDirection?: HorizontalDirection;
   lastAutoMoveAt?: number;
   softDropPressed: boolean;
+  softDropPressedAt?: number;
+  lastSoftDropAt?: number;
   holdPressed: boolean;
   rotateCWPressed: boolean;
   rotateCCWPressed: boolean;
@@ -66,9 +68,21 @@ export const releaseHorizontal = (state: InputState, direction: HorizontalDirect
   return { ...next, activeHorizontalDirection: undefined, lastAutoMoveAt: undefined };
 };
 
-export const setSoftDropPressed = (state: InputState, pressed: boolean): InputState => ({
+export const pressSoftDrop = (state: InputState, nowMs: number): InputState => {
+  if (state.softDropPressed) return state;
+  return {
+    ...state,
+    softDropPressed: true,
+    softDropPressedAt: nowMs,
+    lastSoftDropAt: undefined,
+  };
+};
+
+export const releaseSoftDrop = (state: InputState): InputState => ({
   ...state,
-  softDropPressed: pressed,
+  softDropPressed: false,
+  softDropPressedAt: undefined,
+  lastSoftDropAt: undefined,
 });
 
 export const setHoldPressed = (state: InputState, pressed: boolean): InputState => ({

@@ -90,6 +90,9 @@ function withLineGuard(state: GameAppState): GameAppState {
       ...state.combat,
       enemy: {
         ...state.combat.enemy,
+        calculatedStats: state.combat.enemy.calculatedStats
+          ? { ...state.combat.enemy.calculatedStats, intentEveryActions: 3, garbageLines: 1, garbageDelayActions: 2 }
+          : undefined,
         definition: {
           ...state.combat.enemy.definition,
           pattern: { ...state.combat.enemy.definition.pattern, intentEveryActions: 3, garbageLines: 1 },
@@ -105,7 +108,7 @@ function withDurableEnemy(state: GameAppState): GameAppState {
     ...state,
     combat: {
       ...state.combat,
-      enemy: { ...state.combat.enemy, hp: 99, definition: { ...state.combat.enemy.definition, maxHp: 99 } },
+      enemy: { ...state.combat.enemy, hp: 99, maxHp: 99, definition: { ...state.combat.enemy.definition, maxHp: 99 } },
     },
   };
 }

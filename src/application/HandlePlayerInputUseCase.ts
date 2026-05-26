@@ -1,7 +1,6 @@
 import type { GameAppState, PlayerInput } from "./GameAppState";
 import type { RandomProvider } from "../domain/shared/RandomProvider";
 import { PieceQueue } from "../domain/tetris/PieceQueue";
-import { ActivePiece } from "../domain/tetris/ActivePiece";
 import type { TetrominoType } from "../domain/tetris/Cell";
 import { MovementSystem } from "../domain/tetris/MovementSystem";
 import { RotationSystem } from "../domain/tetris/RotationSystem";
@@ -10,9 +9,12 @@ import { LockActivePieceUseCase } from "./LockActivePieceUseCase";
 import type { PlayerCombatState } from "../domain/combat/CombatState";
 import type { ActivePiece as ActivePieceType } from "../domain/tetris/ActivePiece";
 import { GhostPieceCalculator } from "../domain/tetris/GhostPieceCalculator";
+import { createEnteredSpawnPiece } from "../domain/tetris/SpawnRules";
 import type { LastSpinAction } from "../domain/tetris/SpinDetector";
 import type { LastRotation } from "../domain/tetris/rotation/RotationAttemptResult";
 import type { InitialActionState } from "./input/InitialActionState";
+import { triggerCombatGameOver } from "./CombatGameOver";
+import type { GameEvent } from "../domain/shared/GameEvent";
 
 export type PlayerInputExecutionResult = {
   state: GameAppState;
@@ -31,7 +33,10 @@ export class HandlePlayerInputUseCase {
 
   executeWithResult(state: GameAppState, input: PlayerInput, nowMs = 0, initialAction?: InitialActionState): PlayerInputExecutionResult {
     const activePiece = state.combat?.player.activePiece;
-    if (!state.combat || !activePiece || state.combat.result !== "ongoing") return { state, executed: false };
+    if (!state.combat || state.combat.result !== "ongoing") return { state, executed: false };
+    if (!activePiece) {
+      return { state: triggerCombatGameOver(state, "missingActivePiece", ["activePiece missing during active combat"]), executed: false };
+    }
     const player = state.combat.player;
     const movement = new MovementSystem();
     const rotation = new RotationSystem();
@@ -44,53 +49,61 @@ export class HandlePlayerInputUseCase {
     if (input === "rotate180") piece = rotation.tryRotate180(player.board, piece);
     if (input === "hold") {
       if (!this.ruleSet.holdEnabled) return { state, executed: false };
-      const holdResult = player.holdSlot.hold(activePiece.type);
-      if (holdResult.slot === player.holdSlot) return { state, executed: false };
+      const currentHoldSlot = player.holdSlot.withMaxSlots(this.ruleSet.maxHoldSlots);
+      const holdResult = currentHoldSlot.hold(activePiece.type);
+      if (holdResult.slot === currentHoldSlot) return { state, executed: false };
 
       const queue = new PieceQueue(this.random, player.pieceQueue);
       const nextPieceType: TetrominoType = holdResult.swapped ?? queue.popNext();
       queue.ensureQueueSize(this.ruleSet.nextPreviewCount + 1);
-      const nextPiece = new ActivePiece(nextPieceType, { x: Math.floor(this.ruleSet.boardWidth / 2), y: 0 });
+      const nextPiece = createEnteredSpawnPiece(nextPieceType, player.board, this.ruleSet);
       const canPlaceNextPiece = player.board.canPlace(nextPiece);
-      return {
-        state: {
-          ...state,
-          scene: canPlaceNextPiece ? state.scene : "runResult",
-          runResult: canPlaceNextPiece ? state.runResult : { result: "defeat", title: "Run Failed", message: "The stack reached the top." },
-          combat: {
-            ...state.combat,
-            player: {
-              ...player,
-              activePiece: canPlaceNextPiece ? nextPiece : undefined,
-              pieceQueue: holdResult.swapped ? player.pieceQueue : queue.snapshot(),
-              nextPieces: holdResult.swapped ? player.nextPieces : queue.peekNext(this.ruleSet.nextPreviewCount),
-              hold: holdResult.slot.held,
-              holdSlot: holdResult.slot,
-              isGrounded: false,
-              groundedSinceMs: undefined,
-              lockElapsedMs: 0,
-              lockResetCount: 0,
-              lastLockResetAtMs: undefined,
-              lockResetLimitReachedLogged: false,
-              lastSpinAction: undefined,
-            },
-            result: canPlaceNextPiece ? state.combat.result : "defeat",
-            log: [...state.combat.log, { type: "PieceSpawned", pieceType: nextPieceType }],
+      const nextState: GameAppState = {
+        ...state,
+        combat: {
+          ...state.combat,
+          player: {
+            ...player,
+            activePiece: nextPiece,
+            pieceQueue: holdResult.swapped ? player.pieceQueue : queue.snapshot(),
+            nextPieces: holdResult.swapped ? player.nextPieces : queue.peekNext(this.ruleSet.nextPreviewCount),
+            hold: holdResult.slot.held,
+            holdSlot: holdResult.slot,
+            holdSlots: holdResult.slot.holdSlots,
+            maxHoldSlots: holdResult.slot.maxHoldSlots,
+            hasHeldThisPiece: holdResult.slot.hasHeldThisPiece,
+            holdUsedThisBattle: true,
+            isGrounded: false,
+            groundedSinceMs: undefined,
+            lockElapsedMs: 0,
+            lockResetCount: 0,
+            lastLockResetAtMs: undefined,
+            lockResetLimitReachedLogged: false,
+            lastSpinAction: undefined,
           },
-          events: [...state.events, { type: "PieceSpawned", pieceType: nextPieceType }],
+          log: [...state.combat.log, { type: "PieceSpawned" as const, pieceType: nextPieceType }],
         },
+        events: [...state.events, { type: "PieceSpawned" as const, pieceType: nextPieceType }],
+      };
+      return {
+        state: canPlaceNextPiece
+          ? nextState
+          : triggerCombatGameOver(nextState, "spawnCollision", [
+              "spawn failed",
+              "cannot place spawned piece",
+              "gameOver triggered by spawn collision",
+            ], nextPiece),
         executed: true,
       };
     }
 
     if (input !== "hardDrop") {
-      const changed =
-        piece.position.x !== activePiece.position.x ||
-        piece.position.y !== activePiece.position.y ||
-        piece.rotation !== activePiece.rotation;
+      const changed = activePieceChanged(activePiece, piece);
       if (!changed) return { state, executed: false };
       const lockReset = applyLockReset(player, activePiece, piece, input, this.ruleSet.maxLockResets, nowMs);
       const lastSpinAction = spinActionAfterInput(player, piece, input);
+      const actionSoundEvent = actionSoundEventAfterInput(input);
+      const events = [lockReset.event, actionSoundEvent].filter((event): event is GameEvent => event !== undefined);
       return {
         state: {
           ...state,
@@ -99,14 +112,14 @@ export class HandlePlayerInputUseCase {
             player: { ...lockReset.player, activePiece: piece, lastSpinAction },
             log: lockReset.event ? [...state.combat.log, lockReset.event] : state.combat.log,
           },
-          events: lockReset.event ? [...state.events, lockReset.event] : state.events,
+          events: events.length > 0 ? [...state.events, ...events] : state.events,
         },
         executed: true,
       };
     }
 
     const dropPiece = new GhostPieceCalculator().calculate(player.board, piece) ?? piece;
-    return { state: new LockActivePieceUseCase(this.random, this.ruleSet).execute(state, dropPiece, initialAction), executed: true };
+    return { state: new LockActivePieceUseCase(this.random, this.ruleSet).execute(state, dropPiece, initialAction, nowMs), executed: true };
   }
 }
 
@@ -177,4 +190,21 @@ function spinActionAfterInput(player: PlayerCombatState, piece: ActivePieceType,
 
 function isSuccessfulRotation(lastRotation: LastRotation | undefined): lastRotation is LastSpinAction {
   return lastRotation?.success === true;
+}
+
+function activePieceChanged(fromPiece: ActivePieceType, toPiece: ActivePieceType): boolean {
+  if (fromPiece.position.x !== toPiece.position.x) return true;
+  if (fromPiece.position.y !== toPiece.position.y) return true;
+  if (fromPiece.rotation !== toPiece.rotation) return true;
+  const fromBlocks = fromPiece.blocks();
+  const toBlocks = toPiece.blocks();
+  return fromBlocks.some((block, index) => block.x !== toBlocks[index]?.x || block.y !== toBlocks[index]?.y);
+}
+
+function actionSoundEventAfterInput(input: PlayerInput): GameEvent | undefined {
+  if (input === "moveLeft" || input === "moveRight") return { type: "PlayerActionSucceeded", action: "move" };
+  if (input === "rotateClockwise" || input === "rotateCounterClockwise" || input === "rotate180") {
+    return { type: "PlayerActionSucceeded", action: "rotate" };
+  }
+  return undefined;
 }

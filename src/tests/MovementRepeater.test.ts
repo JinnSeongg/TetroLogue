@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MovementRepeater } from "../application/input/MovementRepeater";
-import { createInputState, pressHorizontal, releaseHorizontal } from "../application/input/InputState";
+import { createInputState, pressHorizontal, pressSoftDrop, releaseHorizontal, releaseSoftDrop } from "../application/input/InputState";
 import { defaultPlayerSettings } from "../application/settings/PlayerSettings";
 
 const settings = { ...defaultPlayerSettings, input: { ...defaultPlayerSettings.input, dasMs: 100, arrMs: 40 } };
@@ -87,5 +87,40 @@ describe("MovementRepeater", () => {
     const result = new MovementRepeater().next(fallback, 100, settings);
 
     expect(result.moves).toEqual(["left"]);
+  });
+
+  it("repeats soft drop at the configured interval", () => {
+    const input = pressSoftDrop(createInputState(), 0);
+    const repeater = new MovementRepeater();
+
+    const beforeInterval = repeater.next(input, 19, settings);
+    const first = repeater.next(input, 20, settings);
+    const second = repeater.next(first.inputState, 65, settings);
+
+    expect(beforeInterval.softDropSteps).toBe(0);
+    expect(first.softDropSteps).toBe(1);
+    expect(second.softDropSteps).toBe(2);
+  });
+
+  it("can repeat horizontal movement and soft drop in the same frame", () => {
+    const horizontal = holdRightAt(0);
+    const input = pressSoftDrop(horizontal, 0);
+
+    const result = new MovementRepeater().next(input, 100, settings);
+
+    expect(result.moves).toEqual(["right"]);
+    expect(result.softDropSteps).toBe(5);
+  });
+
+  it("resets soft drop repeat state when the key is released", () => {
+    const held = pressSoftDrop(createInputState(), 0);
+    const repeated = new MovementRepeater().next(held, 60, settings);
+    const released = releaseSoftDrop(repeated.inputState);
+
+    const result = new MovementRepeater().next(released, 100, settings);
+
+    expect(result.softDropSteps).toBe(0);
+    expect(result.inputState.softDropPressedAt).toBeUndefined();
+    expect(result.inputState.lastSoftDropAt).toBeUndefined();
   });
 });

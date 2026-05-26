@@ -22,9 +22,7 @@ describe("LocalStorageSaveRepository", () => {
   it("rehydrates run state and owned relics", () => {
     const random = new SeededRandomProvider(16);
     const started = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
-    const hit1 = new ResolveLineClearUseCase(random).execute(started, 4);
-    const hit2 = new ResolveLineClearUseCase(random).execute(hit1, 4);
-    const victory = new ResolveLineClearUseCase(random).execute(hit2, 4);
+    const victory = defeatEnemyWithTetrises(started, random);
     const rewardId = victory.reward?.choices[0].id;
     if (!rewardId) throw new Error("Expected reward");
     const selected = new SelectRewardUseCase().execute(victory, rewardId);
@@ -95,3 +93,11 @@ describe("LocalStorageSaveRepository", () => {
     expect(new LocalStorageSaveRepository("test", storage).load()).toBeUndefined();
   });
 });
+
+function defeatEnemyWithTetrises(state: ReturnType<StartCombatUseCase["execute"]>, random: SeededRandomProvider) {
+  let next = state;
+  for (let index = 0; index < 200 && next.scene === "combat"; index += 1) {
+    next = new ResolveLineClearUseCase(random).execute(next, 4);
+  }
+  return next;
+}

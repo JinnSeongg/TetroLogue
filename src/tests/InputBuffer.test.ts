@@ -64,6 +64,7 @@ describe("InputBuffer", () => {
 
     expect(buffered.inputBuffer?.entries.map((entry) => entry.command)).toEqual(["rotateClockwise"]);
     expect(processed.combat?.player.activePiece?.rotation).toBe("R");
+    expect(processed.events.at(-1)).toEqual({ type: "PlayerActionSucceeded", action: "rotate" });
     expect(processed.inputBuffer?.entries).toEqual([]);
   });
 
@@ -132,6 +133,7 @@ describe("InputBuffer", () => {
 
     const processed = new ProcessBufferedInputUseCase(random).execute(state, 10);
 
+    expect(processed.events.at(-1)).toEqual({ type: "PlayerActionSucceeded", action: "move" });
     expect(processed.inputBuffer?.entries).toEqual([]);
   });
 

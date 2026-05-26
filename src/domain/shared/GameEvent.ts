@@ -19,6 +19,9 @@ export type GameEvent =
       finalAttack: number;
       baseDamage?: number;
       totalDamage?: number;
+      preRelicTotalDamage?: number;
+      relicAttackBonus?: number;
+      appliedRelicIds?: string[];
       actionName?: string;
       lineClearCount?: number;
       spinResult?: SpinResult;
@@ -31,7 +34,10 @@ export type GameEvent =
   | { type: "GarbageCanceled"; canceledLines: number; remainingPending: number }
   | { type: "GarbageApplied"; lines: number; holeX: number }
   | { type: "CombatFeedback"; feedback: CombatFeedbackEvent }
+  | { type: "CombatDiagnostic"; message: string }
   | { type: "LockResetLimitReached"; count: number }
+  | { type: "PlayerActionSucceeded"; action: "move" | "rotate" | "softDrop" }
+  | { type: "FastStateChanged"; active: boolean; fastChainCount: number }
   | { type: "CombatEnded"; result: "victory" | "defeat" }
   | { type: "RewardOffered"; rewardIds: string[] }
   | { type: "RewardSelected"; rewardId: string }

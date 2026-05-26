@@ -29,6 +29,7 @@ function formatEvent(event: GameEvent): string {
   if (event.type === "GarbagePending") return `${event.lines} garbage pending`;
   if (event.type === "GarbageCanceled") return `Canceled ${event.canceledLines} garbage`;
   if (event.type === "GarbageApplied") return `${event.lines} garbage added`;
+  if (event.type === "CombatDiagnostic") return event.message;
   if (event.type === "ComboChanged") return `Combo ${event.combo}`;
   if (event.type === "BackToBackChanged") return `Back-to-back ${event.active ? "on" : "off"}`;
   if (event.type === "RewardOffered") return "Reward offered";

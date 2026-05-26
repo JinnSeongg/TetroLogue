@@ -15,6 +15,11 @@ import { createClearResult, type ClearResult } from "../domain/tetris/ClearResul
 import { ComboB2BTracker, type ComboB2BTrackerConfig } from "../domain/combat/ComboB2BTracker";
 import { FieldAnalyzer } from "../domain/combat/field-analysis/FieldAnalyzer";
 import { CombatFeedbackEventFactory } from "../domain/combat/CombatFeedbackEventFactory";
+import type { BattleResultSummary, CombatTelemetry } from "../domain/combat/BattleResultSummary";
+import { createInitialCombatTelemetry } from "../domain/combat/BattleResultSummary";
+import type { CombatState } from "../domain/combat/CombatState";
+import { triggerCombatGameOver } from "./CombatGameOver";
+import { EffectResolver } from "../domain/relic/EffectResolver";
 
 export class ResolveLineClearUseCase {
   constructor(
@@ -30,20 +35,53 @@ export class ResolveLineClearUseCase {
     clearResult: ClearResult = createClearResult({ linesCleared, spinResult, isPerfectClear }),
   ): GameAppState {
     if (!state.combat || !state.run || state.combat.result !== "ongoing") return state;
-    const attack = new AttackCalculator().calculate({
+    if (!state.combat.player.activePiece) {
+      return triggerCombatGameOver(state, "missingActivePiece", ["activePiece missing during active combat"]);
+    }
+    const baseAttack = new AttackCalculator().calculate({
       lineClearCount: linesCleared,
       spinResult,
       isPerfectClear,
       comboBefore: Math.max(0, state.combat.player.combo),
       wasB2BActive: state.combat.player.backToBackActive,
     });
+    const attackFieldState = new FieldAnalyzer().analyze(state.combat.player.board);
     const garbageQueue = new GarbageQueue(
-      { defaultDelay: garbageConfig.defaultIncomingGarbageDelay },
+      { defaultDelay: state.combat.enemy.calculatedStats?.garbageDelayActions ?? garbageConfig.defaultIncomingGarbageDelay },
       state.combat.enemy.garbageQueue?.getPackets() ??
         (state.combat.enemy.pendingGarbage
           ? [{ id: "garbage_1", amount: state.combat.enemy.pendingGarbage, source: "legacy_pending", remainingDelay: 0 }]
           : []),
     );
+    const relicAttack = new EffectResolver().applyAttackModifiers(
+      baseAttack.totalDamage,
+      state.run.relicInventory.getDefinitions(),
+      {
+        linesCleared,
+        backToBackActive: state.combat.player.backToBackActive,
+        isDanger: attackFieldState.dangerLevel === "Danger" || attackFieldState.dangerLevel === "Critical",
+        fieldHeight: attackFieldState.maxHeight,
+        holdUsedThisBattle: state.combat.player.holdUsedThisBattle,
+        pendingGarbageLines: garbageQueue.getTotalAmount(),
+        isFast: state.combat.player.isFastState,
+        fastChain: state.combat.player.fastChainCount,
+        holeCount: attackFieldState.holeCount,
+        isTSpin: clearResult.isTSpin,
+        isTSpinMini: clearResult.isTSpinMini,
+        isTSpinFull: clearResult.isTSpin && !clearResult.isTSpinMini,
+        combo: baseAttack.comboAfter,
+        comboBonus: baseAttack.comboBonus,
+        attackKind: baseAttack.attackType,
+      },
+      { includeDetails: true },
+    );
+    const attack = {
+      ...baseAttack,
+      totalDamage: relicAttack.attack,
+      preRelicTotalDamage: relicAttack.preRelicAttack,
+      relicAttackBonus: relicAttack.relicAttackBonus,
+      appliedRelicIds: relicAttack.appliedRelicIds,
+    };
     const cancelResult = garbageQueue.cancelWithAttack(attack.totalDamage);
     // Damage order: player attack cancels pending garbage first, then remaining attack is reduced by enemy defense.
     const damage = new DamageResolver().resolve(state.combat.enemy.definition, cancelResult.remainingAttackDamage, linesCleared);
@@ -69,18 +107,44 @@ export class ResolveLineClearUseCase {
       offsetAmount: cancelResult.cancelledGarbage,
     });
     const nextEnemyHp = Math.max(0, state.combat.enemy.hp - damage);
+    const damageDealtToEnemy = Math.min(state.combat.enemy.hp, damage);
     const result = nextEnemyHp <= 0 ? "victory" : "ongoing";
     const currentNode = getCurrentNode(state.run.progress);
     const runWon = result === "victory" && currentNode?.type === "finalBoss";
     const canCreateIntent = result === "ongoing" && !garbageDefeat;
-    const generatedIntent = canCreateIntent ? new EnemyPatternSystem().nextIntent(state.combat.enemy.definition, nextActionCount) : undefined;
+    const generatedIntent = canCreateIntent
+      ? new EnemyPatternSystem().nextIntent(state.combat.enemy.definition, nextActionCount, state.combat.enemy.calculatedStats)
+      : undefined;
     if (generatedIntent?.garbageLines) {
       garbageQueue.enqueue(generatedIntent.garbageLines, generatedIntent.id);
     }
+    const nextTelemetry = updateCombatTelemetry({
+      combat: state.combat,
+      playerAttackGenerated: attack.totalDamage,
+      attackBlockedByPendingGarbage: cancelResult.cancelledGarbage,
+      damageDealtToEnemy,
+      garbageQueued: generatedIntent?.garbageLines ?? 0,
+      garbageCancelled: cancelResult.cancelledGarbage,
+      garbageApplied: garbageResult.appliedLines,
+      linesCleared,
+      boardHeight: dangerState.maxHeight,
+    });
     const nextIntent = generatedIntent ?? state.combat.enemy.currentIntent;
     const nextPendingGarbage = garbageQueue.getTotalAmount();
     const finalResult = garbageDefeat ? "defeat" : result;
-    const reward = finalResult === "victory" && !runWon ? { choices: new RewardGenerator(relicRewardTable, this.random).generate(3) } : state.reward;
+    const battleResultSummary =
+      finalResult === "ongoing"
+        ? state.combat.lastBattleResultSummary
+        : createBattleResultSummary({
+            state,
+            telemetry: nextTelemetry,
+            finalBoardHeight: dangerState.maxHeight,
+            result: finalResult === "victory" ? "win" : "loss",
+          });
+    const reward =
+      finalResult === "victory" && !runWon
+        ? { choices: new RewardGenerator(relicRewardTable, this.random).generate(3, state.run.relicInventory) }
+        : state.reward;
     const combatEvents: GameEvent[] = [
       { type: "SpinDetected" as const, spinResult },
       ...(linesCleared > 0 ? [{ type: "LineCleared" as const, lines: linesCleared, spinResult, clearResult }] : []),
@@ -94,6 +158,9 @@ export class ResolveLineClearUseCase {
         finalAttack: attack.totalDamage,
         baseDamage: attack.baseDamage,
         totalDamage: attack.totalDamage,
+        preRelicTotalDamage: attack.preRelicTotalDamage,
+        relicAttackBonus: attack.relicAttackBonus,
+        appliedRelicIds: attack.appliedRelicIds,
         actionName: attack.actionName,
         lineClearCount: linesCleared,
         spinResult,
@@ -126,7 +193,8 @@ export class ResolveLineClearUseCase {
       ...(finalResult === "defeat" ? [{ type: "CombatEnded" as const, result: "defeat" as const }] : []),
       ...(reward && finalResult === "victory" ? [{ type: "RewardOffered" as const, rewardIds: reward.choices.map((choice) => choice.id) }] : []),
     ];
-    return {
+    const activePieceBlocked = finalResult === "ongoing" && !boardAfterGarbage.canPlace(state.combat.player.activePiece);
+    const nextState: GameAppState = {
       ...state,
       scene: garbageDefeat ? "runResult" : runWon ? "runResult" : finalResult === "victory" ? "reward" : state.scene,
       runResult: garbageDefeat
@@ -138,6 +206,7 @@ export class ResolveLineClearUseCase {
       combat: {
         ...state.combat,
         enemy: { ...state.combat.enemy, hp: nextEnemyHp, currentIntent: nextIntent, pendingGarbage: nextPendingGarbage, garbageQueue },
+        telemetry: nextTelemetry,
         result: finalResult,
         lastAttack: damage,
         lastBaseAttack: attack.baseDamage,
@@ -146,10 +215,11 @@ export class ResolveLineClearUseCase {
         lastClearResult: clearResult,
         lastComboB2BResult: comboB2BResult,
         lastFeedbackEvent: feedbackEvent,
+        lastBattleResultSummary: battleResultSummary,
         player: {
           ...state.combat.player,
           board: boardAfterGarbage,
-          activePiece: boardAfterGarbage.canPlace(state.combat.player.activePiece!) ? state.combat.player.activePiece : undefined,
+          activePiece: state.combat.player.activePiece,
           combo: comboB2BResult.comboCount,
           comboDisplayCount: comboB2BResult.comboDisplayCount,
           backToBackActive: comboB2BResult.isBackToBack,
@@ -161,5 +231,69 @@ export class ResolveLineClearUseCase {
       reward,
       events: [...state.events, ...combatEvents],
     };
+    return activePieceBlocked
+      ? triggerCombatGameOver(nextState, "spawnCollision", ["cannot place spawned piece", "gameOver triggered by spawn collision"], state.combat.player.activePiece)
+      : nextState;
   }
+}
+
+function updateCombatTelemetry(input: {
+  combat: CombatState;
+  playerAttackGenerated: number;
+  attackBlockedByPendingGarbage: number;
+  damageDealtToEnemy: number;
+  garbageQueued: number;
+  garbageCancelled: number;
+  garbageApplied: number;
+  linesCleared: number;
+  boardHeight: number;
+}): CombatTelemetry {
+  const telemetry = input.combat.telemetry ?? createInitialCombatTelemetry();
+  return {
+    ...telemetry,
+    totalPlayerAttackGenerated: telemetry.totalPlayerAttackGenerated + input.playerAttackGenerated,
+    totalAttackBlockedByPendingGarbage: telemetry.totalAttackBlockedByPendingGarbage + input.attackBlockedByPendingGarbage,
+    totalDamageDealtToEnemy: telemetry.totalDamageDealtToEnemy + input.damageDealtToEnemy,
+    totalGarbageQueued: telemetry.totalGarbageQueued + input.garbageQueued,
+    totalGarbageCancelled: telemetry.totalGarbageCancelled + input.garbageCancelled,
+    totalGarbageApplied: telemetry.totalGarbageApplied + input.garbageApplied,
+    linesClearedTotal: telemetry.linesClearedTotal + input.linesCleared,
+    maxBoardHeight: Math.max(telemetry.maxBoardHeight, input.boardHeight),
+  };
+}
+
+function createBattleResultSummary(input: {
+  state: GameAppState;
+  telemetry: CombatTelemetry;
+  finalBoardHeight: number;
+  result: BattleResultSummary["result"];
+}): BattleResultSummary {
+  const combat = input.state.combat!;
+  const run = input.state.run!;
+  return {
+    floor: run.progress.currentFloor,
+    difficultyId: run.difficultyId ?? "standard",
+    enemyId: combat.enemy.definition.id,
+    enemyRole: combat.enemy.definition.role,
+    enemyTraits: combat.enemy.definition.traits,
+    calculatedEnemyStats: combat.enemy.calculatedStats,
+    battleDurationSeconds: round(input.telemetry.battleDurationMs / 1000, 2),
+    totalPlayerAttackGenerated: input.telemetry.totalPlayerAttackGenerated,
+    totalAttackBlockedByPendingGarbage: input.telemetry.totalAttackBlockedByPendingGarbage,
+    totalDamageDealtToEnemy: input.telemetry.totalDamageDealtToEnemy,
+    totalGarbageQueued: input.telemetry.totalGarbageQueued,
+    totalGarbageCancelled: input.telemetry.totalGarbageCancelled,
+    totalGarbageApplied: input.telemetry.totalGarbageApplied,
+    linesClearedTotal: input.telemetry.linesClearedTotal,
+    estimatedSurvivalTax: input.telemetry.totalAttackBlockedByPendingGarbage + input.telemetry.totalGarbageApplied,
+    maxBoardHeight: input.telemetry.maxBoardHeight,
+    finalBoardHeight: input.finalBoardHeight,
+    result: input.result,
+    selectedRelics: run.relicInventory.relics.map((relic) => relic.definitionId),
+  };
+}
+
+function round(value: number, digits: number): number {
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
 }

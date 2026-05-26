@@ -36,26 +36,26 @@ describe("gravity and lock delay", () => {
   it("soft drop moves faster than normal gravity", () => {
     const random = new SeededRandomProvider(32);
     const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
-    const normal = new TickCombatUseCase(random, fastRuleSet).execute(state, 20, false);
-    const soft = new TickCombatUseCase(random, fastRuleSet).execute(state, 20, true);
+    const normal = new TickCombatUseCase(random, fastRuleSet).execute(state, 20, 0);
+    const soft = new TickCombatUseCase(random, fastRuleSet).execute(state, 20, 1);
 
     expect(normal.combat?.player.activePiece?.position.y).toBe(state.combat?.player.activePiece?.position.y);
     expect(soft.combat?.player.activePiece?.position.y).toBe((state.combat?.player.activePiece?.position.y ?? 0) + 1);
+    expect(normal.events.some((event) => event.type === "PlayerActionSucceeded")).toBe(false);
+    expect(soft.events.at(-1)).toEqual({ type: "PlayerActionSucceeded", action: "softDrop" });
   });
 
-  it("reads soft drop speed from the active rule set", () => {
+  it("moves multiple soft drop steps in one frame", () => {
     const random = new SeededRandomProvider(34);
     const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
-    const slowSoftDropRuleSet = { ...standardRuleSet, gravityMs: 100, softDropGravityMs: 60 };
 
-    const beforeSoftInterval = new TickCombatUseCase(random, slowSoftDropRuleSet).execute(state, 40, true);
-    const afterSoftInterval = new TickCombatUseCase(random, slowSoftDropRuleSet).execute(state, 60, true);
+    const next = new TickCombatUseCase(random, fastRuleSet).execute(state, 16, 3);
 
-    expect(beforeSoftInterval.combat?.player.activePiece?.position.y).toBe(state.combat?.player.activePiece?.position.y);
-    expect(afterSoftInterval.combat?.player.activePiece?.position.y).toBe((state.combat?.player.activePiece?.position.y ?? 0) + 1);
+    expect(next.combat?.player.activePiece?.position.y).toBe((state.combat?.player.activePiece?.position.y ?? 0) + 3);
+    expect(next.events.filter((event) => event.type === "PlayerActionSucceeded" && event.action === "softDrop")).toHaveLength(3);
   });
 
-  it("does not spend normal gravity buildup as an instant soft drop on first press", () => {
+  it("does not spend normal gravity buildup as extra soft drop movement", () => {
     const random = new SeededRandomProvider(35);
     const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
     if (!state.combat?.player.activePiece) throw new Error("Expected active piece");
@@ -67,12 +67,14 @@ describe("gravity and lock delay", () => {
       },
     };
 
-    const firstSoftTick = new TickCombatUseCase(random, fastRuleSet).execute(primedState, 1, true);
-    const secondSoftTick = new TickCombatUseCase(random, fastRuleSet).execute(firstSoftTick, 19, true);
+    const firstSoftTick = new TickCombatUseCase(random, fastRuleSet).execute(primedState, 1, 0);
+    const secondSoftTick = new TickCombatUseCase(random, fastRuleSet).execute(firstSoftTick, 19, 1);
 
     expect(firstSoftTick.combat?.player.activePiece?.position.y).toBe(state.combat.player.activePiece.position.y);
-    expect(firstSoftTick.combat?.player.gravityElapsedMs).toBe(1);
+    expect(firstSoftTick.combat?.player.gravityElapsedMs).toBe(91);
+    expect(firstSoftTick.events.some((event) => event.type === "PlayerActionSucceeded")).toBe(false);
     expect(secondSoftTick.combat?.player.activePiece?.position.y).toBe(state.combat.player.activePiece.position.y + 1);
+    expect(secondSoftTick.events.at(-1)).toEqual({ type: "PlayerActionSucceeded", action: "softDrop" });
   });
 
   it("hardDrop locks immediately", () => {

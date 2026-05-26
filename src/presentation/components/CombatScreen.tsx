@@ -3,6 +3,7 @@ import { BoardView } from "./BoardView";
 import { CombatHUD } from "./CombatHUD";
 import { HoldRenderer } from "./HoldRenderer";
 import { QueueRenderer } from "./QueueRenderer";
+import { FastChainIndicator } from "./FastChainIndicator";
 import { RelicPanel } from "./RelicPanel";
 import type { PlayerSettings } from "../../application/settings/PlayerSettings";
 import { CombatFeedbackPanel } from "./CombatFeedbackPanel";
@@ -10,6 +11,7 @@ import { AttackAnimationController } from "./AttackAnimationController";
 import { ScreenShakeController } from "./ScreenShakeController";
 import { DangerVisualController } from "./DangerVisualController";
 import { GarbageGauge } from "./GarbageGauge";
+import { BalancePreviewPanel } from "./BalancePreviewPanel";
 
 type Props = {
   state: GameAppState;
@@ -22,12 +24,14 @@ type Props = {
 export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode, settings }: Props) {
   const combat = state.combat;
   const garbagePreview = combat?.enemy.garbageQueue.getPreview();
+  const floor = state.run?.progress.currentFloor;
   return (
     <AttackAnimationController event={combat?.lastFeedbackEvent}>
       {(attackAnimation) => (
         <ScreenShakeController event={combat?.lastFeedbackEvent} enabled={settings.video.screenShakeEnabled}>
           {(shakeStyle) => (
             <main className="app-shell combat-shell" style={shakeStyle}>
+              <div className="combat-floor-label">{typeof floor === "number" ? `FLOOR ${floor}` : "FLOOR -"}</div>
               <DangerVisualController dangerLevel={combat?.lastFeedbackEvent?.dangerLevel ?? "Safe"} incomingGarbageAmount={garbagePreview?.totalAmount ?? 0}>
                 {(dangerVisual) => (
                   <div className="play-area-wrapper">
@@ -61,6 +65,7 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
                       </section>
                       <aside className="combat-right">
                         <QueueRenderer nextPieces={combat?.player.nextPieces ?? []} />
+                        <FastChainIndicator fastChainCount={combat?.player.fastChainCount} isFastState={combat?.player.isFastState} />
                         <CombatFeedbackPanel event={combat?.lastFeedbackEvent} visibleMs={2200} />
                         {devMode ? (
                           <section className="panel">
@@ -72,6 +77,7 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
                                 </button>
                               ))}
                             </div>
+                            <BalancePreviewPanel />
                           </section>
                         ) : null}
                       </aside>

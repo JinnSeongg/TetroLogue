@@ -12,6 +12,9 @@ import type { GarbageQueue } from "./GarbageQueue";
 import type { ClearResult } from "../tetris/ClearResult";
 import type { ComboB2BResult } from "./ComboB2BTracker";
 import type { CombatFeedbackEvent } from "./CombatFeedbackEvent";
+import type { EnemyCalculatedStats } from "../balance/balanceTypes";
+import type { TetrisRuleSet } from "../tetris/TetrisRuleSet";
+import type { BattleResultSummary, CombatTelemetry } from "./BattleResultSummary";
 
 export type PlayerCombatState = {
   hp: number;
@@ -21,11 +24,18 @@ export type PlayerCombatState = {
   nextPieces: TetrominoType[];
   holdSlot: HoldSlot;
   hold?: TetrominoType;
+  holdSlots: TetrominoType[];
+  maxHoldSlots: number;
+  hasHeldThisPiece: boolean;
+  holdUsedThisBattle: boolean;
   relicInventory: RelicInventory;
   combo: number;
   comboDisplayCount: number;
   backToBackActive: boolean;
   backToBackCount: number;
+  fastChainCount: number;
+  isFastState: boolean;
+  lastPieceLockTimeMs?: number;
   actionCount: number;
   gravityElapsedMs: number;
   lockElapsedMs: number;
@@ -41,6 +51,8 @@ export type PlayerCombatState = {
 export type EnemyCombatState = {
   definition: EnemyDefinition;
   hp: number;
+  maxHp: number;
+  calculatedStats?: EnemyCalculatedStats;
   currentIntent?: EnemyIntent;
   pendingGarbage: number;
   garbageQueue: GarbageQueue;
@@ -49,6 +61,13 @@ export type EnemyCombatState = {
 export type CombatState = {
   player: PlayerCombatState;
   enemy: EnemyCombatState;
+  ruleSet: TetrisRuleSet;
+  ruleSetModifierDebug?: {
+    baseRuleSet: TetrisRuleSet;
+    effectiveRuleSet: TetrisRuleSet;
+    appliedRuleRelicIds: string[];
+  };
+  telemetry?: CombatTelemetry;
   result: CombatResult;
   lastAttack?: number;
   lastBaseAttack?: number;
@@ -57,5 +76,6 @@ export type CombatState = {
   lastClearResult?: ClearResult;
   lastComboB2BResult?: ComboB2BResult;
   lastFeedbackEvent?: CombatFeedbackEvent;
+  lastBattleResultSummary?: BattleResultSummary;
   log: GameEvent[];
 };

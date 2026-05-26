@@ -31,6 +31,6 @@ export const canBufferInput = (state: GameAppState, input: PlayerInput, ruleSet:
   const player = combat?.player;
   if (state.scene !== "combat" || !combat || !player || combat.result !== "ongoing") return false;
   if (!player.activePiece) return false;
-  if (input === "hold") return ruleSet.holdEnabled && !player.holdSlot.usedThisTurn;
+  if (input === "hold") return ruleSet.holdEnabled && !player.holdSlot.withMaxSlots(ruleSet.maxHoldSlots).usedThisTurn;
   return true;
 };

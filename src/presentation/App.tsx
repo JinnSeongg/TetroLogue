@@ -11,7 +11,8 @@ import { LoadPlayerSettingsUseCase } from "../application/settings/LoadPlayerSet
 import { SavePlayerSettingsUseCase } from "../application/settings/SavePlayerSettingsUseCase";
 import type { PlayerSettings } from "../application/settings/PlayerSettings";
 import type { InitialActionState } from "../application/input/InitialActionState";
-import { standardRuleSet } from "../domain/tetris/TetrisRuleSet";
+import type { DifficultyId } from "../domain/balance/balanceTypes";
+import { registerBalanceDebugGlobals } from "../debug/balanceDebug";
 
 export function App() {
   const random = useMemo(() => new BrowserRandomProvider(), []);
@@ -22,19 +23,16 @@ export function App() {
   const [state, setState] = useState<GameAppState>(() => controller.createInitialState());
   const [settings, setSettings] = useState<PlayerSettings>(() => new LoadPlayerSettingsUseCase(settingsRepository).execute());
 
-  const startRun = () => setState(controller.startRun());
+  registerBalanceDebugGlobals(devMode);
+
+  const showDifficultySelect = () => setState(controller.showDifficultySelect());
+  const startRun = (difficultyId: DifficultyId = "standard") => setState(controller.startRun(difficultyId));
   const continueRun = () => setState(controller.continueRun());
   const returnToMenu = () => setState(controller.returnToMenu());
   const handleInput = (input: PlayerInput, nowMs = performance.now(), bufferable = true, initialAction?: InitialActionState) =>
     setState((current) => controller.handleInput(current, input, nowMs, bufferable, initialAction));
-  const tickCombat = (deltaMs: number, softDropPressed: boolean, nowMs = performance.now(), initialAction?: InitialActionState) =>
-    setState((current) =>
-      controller.tickCombat(current, deltaMs, softDropPressed, nowMs, initialAction, {
-        ...standardRuleSet,
-        softDropGravityMs: settings.input.softDropGravityMs,
-        ghostPieceEnabled: settings.video.ghostPieceEnabled,
-      }),
-    );
+  const tickCombat = (deltaMs: number, softDropSteps: number, nowMs = performance.now(), initialAction?: InitialActionState) =>
+    setState((current) => controller.tickCombat(current, deltaMs, softDropSteps, nowMs, initialAction));
   const saveSettings = (next: PlayerSettings) => {
     setSettings(new SavePlayerSettingsUseCase(settingsRepository).execute(next));
   };
@@ -49,7 +47,8 @@ export function App() {
       inputAdapter={inputAdapter}
       onInput={handleInput}
       onTickCombat={tickCombat}
-      onStartRun={startRun}
+      onStartRun={showDifficultySelect}
+      onSelectDifficulty={startRun}
       onContinueRun={continueRun}
       onDebugLineClear={debugLineClear}
       onSelectReward={selectReward}

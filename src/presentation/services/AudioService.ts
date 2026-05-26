@@ -159,6 +159,7 @@ export function soundKeyForInput(input: PlayerInput): SoundEventKey | undefined 
 }
 
 export function soundKeyForGameEvent(event: GameEvent): SoundEventKey | undefined {
+  if (event.type === "PlayerActionSucceeded") return event.action;
   if (event.type === "PiecePlaced") return "lock";
   if (event.type === "CombatEnded") return event.result === "victory" ? "win" : "lose";
   if (event.type === "GarbagePending") return "garbageIncoming";

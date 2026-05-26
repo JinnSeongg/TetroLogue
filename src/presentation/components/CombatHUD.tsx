@@ -18,10 +18,10 @@ export function CombatHUD({ combat, attackAnimation }: Props) {
         <>
           <strong className="enemy-name">{combat.enemy.definition.name}</strong>
           <div className="hp-bar">
-            <div style={{ width: `${(combat.enemy.hp / combat.enemy.definition.maxHp) * 100}%` }} />
+            <div style={{ width: `${(combat.enemy.hp / combat.enemy.maxHp) * 100}%` }} />
           </div>
           <span className="enemy-hp">
-            {combat.enemy.hp}/{combat.enemy.definition.maxHp}
+            {combat.enemy.hp}/{combat.enemy.maxHp}
           </span>
         </>
       ) : (

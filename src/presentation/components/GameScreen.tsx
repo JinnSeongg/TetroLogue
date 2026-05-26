@@ -16,13 +16,16 @@ import { SettingsPanel } from "./SettingsPanel";
 import { RunProgressScreen } from "./RunProgressScreen";
 import { ShopScreen } from "./ShopScreen";
 import { AudioService, soundKeyForUiElement } from "../services/AudioService";
+import { DifficultySelectScreen } from "./DifficultySelectScreen";
+import type { DifficultyId } from "../../domain/balance/balanceTypes";
 
 type Props = {
   state: GameAppState;
   inputAdapter: BrowserInputAdapter;
   onInput: (input: PlayerInput, nowMs?: number, bufferable?: boolean, initialAction?: InitialActionState) => void;
-  onTickCombat: (deltaMs: number, softDropPressed: boolean, nowMs?: number, initialAction?: InitialActionState) => void;
+  onTickCombat: (deltaMs: number, softDropSteps: number, nowMs?: number, initialAction?: InitialActionState) => void;
   onStartRun: () => void;
+  onSelectDifficulty: (difficultyId: DifficultyId) => void;
   onContinueRun: () => void;
   onDebugLineClear: (lines: number) => void;
   onSelectReward: (rewardId: string) => void;
@@ -39,6 +42,7 @@ export function GameScreen(props: Props) {
   const propsRef = useRef(props);
   const audioServiceRef = useRef(new AudioService());
   const lastAudioEventCountRef = useRef(props.state.events.length);
+  const lastBattleSummaryKeyRef = useRef<string | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
   propsRef.current = props;
 
@@ -62,6 +66,18 @@ export function GameScreen(props: Props) {
   }, [props.state.events]);
 
   useEffect(() => {
+    const summary = props.state.combat?.lastBattleResultSummary;
+    if (!props.devMode || !summary) return;
+    const summaryKey = `${summary.floor}:${summary.enemyId}:${summary.result}:${summary.battleDurationSeconds}:${summary.linesClearedTotal}`;
+    if (lastBattleSummaryKeyRef.current === summaryKey) return;
+    lastBattleSummaryKeyRef.current = summaryKey;
+    console.groupCollapsed(`[TetroLogue] Battle Result ${summary.result.toUpperCase()} F${summary.floor} ${summary.enemyId}`);
+    console.table([summary]);
+    console.log("calculatedEnemyStats", summary.calculatedEnemyStats);
+    console.groupEnd();
+  }, [props.devMode, props.state.combat?.lastBattleResultSummary]);
+
+  useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const interactive = event.target.closest("button, .reward-card");
@@ -80,7 +96,6 @@ export function GameScreen(props: Props) {
       const mappedInput = propsRef.current.inputAdapter.mapKey(event.key, propsRef.current.settings);
       if (!mappedInput) return;
       const nowMs = performance.now();
-      const wasSoftDropPressed = inputStateRef.current.softDropPressed;
       const result = keyboardStateAdapter.apply(
         inputStateRef.current,
         { type: "keydown", key: event.key, repeat: event.repeat },
@@ -89,11 +104,7 @@ export function GameScreen(props: Props) {
       event.preventDefault();
       if (result.inputState === inputStateRef.current && !result.immediateInput) return;
       inputStateRef.current = result.inputState;
-      if (mappedInput === "softDrop" && !event.repeat && !wasSoftDropPressed && inputStateRef.current.softDropPressed) {
-        audioServiceRef.current.play("softDrop");
-      }
       if (result.immediateInput) {
-        audioServiceRef.current.playInput(result.immediateInput);
         propsRef.current.onInput(result.immediateInput, nowMs, true, initialActionFromInputState(inputStateRef.current));
       }
     };
@@ -116,10 +127,9 @@ export function GameScreen(props: Props) {
       inputStateRef.current = repeat.inputState;
       for (const direction of repeat.moves) {
         const input = direction === "left" ? "moveLeft" : "moveRight";
-        audioServiceRef.current.playInput(input);
         propsRef.current.onInput(input, time, false, initialActionFromInputState(inputStateRef.current));
       }
-      propsRef.current.onTickCombat(deltaMs, inputStateRef.current.softDropPressed, time, initialActionFromInputState(inputStateRef.current));
+      propsRef.current.onTickCombat(deltaMs, repeat.softDropSteps, time, initialActionFromInputState(inputStateRef.current));
       frameId = requestAnimationFrame(frame);
     };
     frameId = requestAnimationFrame(frame);
@@ -147,6 +157,10 @@ export function GameScreen(props: Props) {
         {settingsModal}
       </>
     );
+  }
+
+  if (props.state.scene === "difficultySelect") {
+    return <DifficultySelectScreen onSelect={props.onSelectDifficulty} onBack={props.onReturnToMenu} />;
   }
 
   if (props.state.scene === "combat") {

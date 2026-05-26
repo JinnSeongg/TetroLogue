@@ -6,24 +6,27 @@ const INSTANT_ARR_MOVE_BUDGET = 20;
 export type MovementRepeatResult = {
   inputState: InputState;
   moves: HorizontalDirection[];
+  softDropSteps: number;
 };
 
 export class MovementRepeater {
   next(input: InputState, nowMs: number, settings: PlayerSettings): MovementRepeatResult {
     const direction = resolveDirection(input);
-    if (!direction) return { inputState: { ...input, lastAutoMoveAt: undefined }, moves: [] };
+    const softDrop = repeatSoftDrop(input, nowMs, settings);
+    if (!direction) return { inputState: { ...softDrop.inputState, lastAutoMoveAt: undefined }, moves: [], softDropSteps: softDrop.steps };
     const pressedAt = direction === "left" ? input.leftPressedAt : input.rightPressedAt;
-    if (pressedAt === undefined) return { inputState: { ...input, lastAutoMoveAt: undefined }, moves: [] };
+    if (pressedAt === undefined) return { inputState: { ...softDrop.inputState, lastAutoMoveAt: undefined }, moves: [], softDropSteps: softDrop.steps };
 
     const firstRepeatAt = pressedAt + settings.input.dasMs;
-    if (nowMs < firstRepeatAt) return { inputState: input, moves: [] };
+    if (nowMs < firstRepeatAt) return { inputState: softDrop.inputState, moves: [], softDropSteps: softDrop.steps };
 
     const previousMoveAt = input.lastAutoMoveAt ?? firstRepeatAt - settings.input.arrMs;
     const arrMs = settings.input.arrMs;
     if (arrMs === 0) {
       return {
-        inputState: { ...input, lastAutoMoveAt: nowMs },
+        inputState: { ...softDrop.inputState, lastAutoMoveAt: nowMs },
         moves: Array.from({ length: INSTANT_ARR_MOVE_BUDGET }, () => direction),
+        softDropSteps: softDrop.steps,
       };
     }
 
@@ -35,10 +38,26 @@ export class MovementRepeater {
     }
 
     return {
-      inputState: moves.length > 0 ? { ...input, lastAutoMoveAt: nextMoveAt - arrMs } : input,
+      inputState: moves.length > 0 ? { ...softDrop.inputState, lastAutoMoveAt: nextMoveAt - arrMs } : softDrop.inputState,
       moves,
+      softDropSteps: softDrop.steps,
     };
   }
+}
+
+function repeatSoftDrop(input: InputState, nowMs: number, settings: PlayerSettings): { inputState: InputState; steps: number } {
+  if (!input.softDropPressed || input.softDropPressedAt === undefined) return { inputState: { ...input, lastSoftDropAt: undefined }, steps: 0 };
+  const intervalMs = Math.max(1, settings.input.softDropGravityMs);
+  let nextDropAt = (input.lastSoftDropAt ?? input.softDropPressedAt) + intervalMs;
+  let steps = 0;
+  while (nextDropAt <= nowMs && steps < INSTANT_ARR_MOVE_BUDGET) {
+    steps += 1;
+    nextDropAt += intervalMs;
+  }
+  return {
+    inputState: steps > 0 ? { ...input, lastSoftDropAt: nextDropAt - intervalMs } : input,
+    steps,
+  };
 }
 
 function resolveDirection(input: InputState): HorizontalDirection | undefined {

@@ -1,6 +1,6 @@
 import type { PlayerInput } from "../application/GameAppState";
 import type { InputState } from "../application/input/InputState";
-import { pressHorizontal, releaseHorizontal, setHoldPressed, setRotatePressed, setSoftDropPressed } from "../application/input/InputState";
+import { pressHorizontal, pressSoftDrop, releaseHorizontal, releaseSoftDrop, setHoldPressed, setRotatePressed } from "../application/input/InputState";
 import { defaultPlayerSettings, type PlayerSettings } from "../application/settings/PlayerSettings";
 import { BrowserInputAdapter, type BrowserControlInput } from "./BrowserInputAdapter";
 
@@ -41,7 +41,7 @@ export class BrowserKeyboardStateAdapter {
     }
 
     if (input === "softDrop") {
-      return { inputState: setSoftDropPressed(inputState, true) };
+      return { inputState: pressSoftDrop(inputState, nowMs) };
     }
 
     return { inputState: this.press(inputState, input), immediateInput: input };
@@ -58,7 +58,7 @@ export class BrowserKeyboardStateAdapter {
   private release(inputState: InputState, input: BrowserControlInput): InputState {
     if (input === "moveLeft") return releaseHorizontal(inputState, "left");
     if (input === "moveRight") return releaseHorizontal(inputState, "right");
-    if (input === "softDrop") return setSoftDropPressed(inputState, false);
+    if (input === "softDrop") return releaseSoftDrop(inputState);
     if (input === "hold") return setHoldPressed(inputState, false);
     if (input === "rotateClockwise") return setRotatePressed(inputState, "CW", false);
     if (input === "rotateCounterClockwise") return setRotatePressed(inputState, "CCW", false);

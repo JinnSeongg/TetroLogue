@@ -91,9 +91,8 @@ describe("GameFlowController", () => {
 });
 
 function defeatEnemyWithTetrises(controller: GameFlowController, state: GameAppState): GameAppState {
-  let next = state;
-  for (let index = 0; index < 8 && next.scene === "combat"; index += 1) {
-    next = controller.debugLineClear(next, 4);
-  }
-  return next;
+  const weakened = state.combat
+    ? { ...state, combat: { ...state.combat, enemy: { ...state.combat.enemy, hp: 1 } } }
+    : state;
+  return controller.debugLineClear(weakened, 4);
 }

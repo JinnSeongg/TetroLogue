@@ -1,3 +1,4 @@
+import type { RelicInventory } from "../relic/RelicInventory";
 import type { RandomProvider } from "../shared/RandomProvider";
 import type { RewardDefinition } from "./RewardDefinition";
 
@@ -7,7 +8,8 @@ export class RewardGenerator {
     private readonly random: RandomProvider,
   ) {}
 
-  generate(count = 3): RewardDefinition[] {
-    return this.random.shuffle([...this.rewards]).slice(0, count);
+  generate(count = 3, inventory?: RelicInventory): RewardDefinition[] {
+    const rewards = inventory ? this.rewards.filter((reward) => inventory.canAdd(reward.relicId)) : this.rewards;
+    return this.random.shuffle([...rewards]).slice(0, count);
   }
 }
