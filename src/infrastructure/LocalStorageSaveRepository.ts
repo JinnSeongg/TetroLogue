@@ -269,7 +269,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               currentIntent: parsed.combat.enemy.currentIntent,
               pendingGarbage: parsed.combat.enemy.pendingGarbage ?? 0,
               garbageQueue: new GarbageQueue(
-                { defaultDelay: parsed.combat.enemy.calculatedStats?.garbageDelayActions ?? garbageConfig.defaultIncomingGarbageDelay },
+                { entryDelayMs: garbageConfig.garbageEntryDelayMs },
                 parsed.combat.enemy.garbagePackets ??
                   (parsed.combat.enemy.pendingGarbage
                     ? [
@@ -277,7 +277,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
                           id: "garbage_1",
                           amount: parsed.combat.enemy.pendingGarbage,
                           source: "loaded_pending",
-                          remainingDelay: 0,
+                          createdAtMs: 0,
+                          readyAtMs: 0,
                         },
                       ]
                     : []),

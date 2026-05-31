@@ -22,7 +22,7 @@ describe("LocalStoragePlayerSettingsRepository", () => {
       input: {
         dasMs: 180,
         arrMs: 30,
-        softDropGravityMs: 18,
+        softDropGravityMs: 30,
         keyBindings: {
           moveLeft: ["ArrowLeft"],
           moveRight: ["ArrowRight"],
@@ -41,7 +41,7 @@ describe("LocalStoragePlayerSettingsRepository", () => {
 
     expect(repository.load().input.dasMs).toBe(180);
     expect(repository.load().input.arrMs).toBe(30);
-    expect(repository.load().input.softDropGravityMs).toBe(18);
+    expect(repository.load().input.softDropGravityMs).toBe(30);
     expect(repository.load().video.ghostPieceEnabled).toBe(false);
     expect(repository.load().audio.masterVolume).toBe(50);
     expect(repository.load().audio.uiVolume).toBe(20);
@@ -68,7 +68,7 @@ describe("LocalStoragePlayerSettingsRepository", () => {
     expect(loaded.audio.musicVolume).toBe(35);
   });
 
-  it("persists softDropGravityMs as a player setting", () => {
+  it("clamps loaded softDropGravityMs to the player setting range", () => {
     const storage = new MemoryStorage();
     storage.setItem(
       "settings",
@@ -79,6 +79,6 @@ describe("LocalStoragePlayerSettingsRepository", () => {
 
     expect(loaded.input.dasMs).toBe(160);
     expect(loaded.input.arrMs).toBe(35);
-    expect(loaded.input.softDropGravityMs).toBe(1);
+    expect(loaded.input.softDropGravityMs).toBe(30);
   });
 });

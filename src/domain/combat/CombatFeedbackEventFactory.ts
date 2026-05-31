@@ -15,6 +15,7 @@ export class CombatFeedbackEventFactory {
       clearName: clearResult?.displayName ?? defaults.clearName,
       clearedLines: clearResult?.linesCleared ?? defaults.clearedLines,
       attackAmount: input.attackResult?.totalDamage ?? defaults.attackAmount,
+      damageDealtToEnemy: input.damageDealtToEnemy ?? defaults.damageDealtToEnemy,
       offsetAmount: input.offsetAmount ?? defaults.offsetAmount,
       comboCount: input.comboB2BResult?.comboCount ?? defaults.comboCount,
       isComboActive: input.comboB2BResult?.isComboActive ?? defaults.isComboActive,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GameFlowController } from "../application/GameFlowController";
 import type { GameAppState } from "../application/GameAppState";
 import type { SaveRunRepository } from "../application/ports/SaveRunRepository";
+import { relicRewardTable, shopRelicRewardTable } from "../data/rewardTables";
 import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
 
 class MemoryRepository implements SaveRunRepository {
@@ -88,6 +89,66 @@ describe("GameFlowController", () => {
     expect(state.scene).toBe("nodeMap");
     expect(state.run?.progress.currentFloor).toBe(5);
   });
+
+  it("skips combat reward when every combat reward relic is already maxed", () => {
+    const controller = new GameFlowController(new SeededRandomProvider(22), new MemoryRepository());
+    let state = withOwnedRewards(controller.startRun(), relicRewardTable);
+
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
+    state = defeatEnemyWithTetrises(controller, state);
+
+    expect(state.scene).toBe("nodeMap");
+    expect(state.reward).toBeUndefined();
+    expect(state.run?.progress.currentFloor).toBe(2);
+  });
+
+  it("skips event reward when every combat reward relic is already maxed", () => {
+    const controller = new GameFlowController(new SeededRandomProvider(23), new MemoryRepository());
+    let state = withOwnedRewards(controller.startRun(), relicRewardTable);
+    state = {
+      ...state,
+      run: state.run
+        ? {
+            ...state.run,
+            progress: {
+              ...state.run.progress,
+              nodes: state.run.progress.nodes.map((node) => (node.floor === 1 ? { floor: 1, type: "event" as const, rewardTableId: "default_relic" } : node)),
+            },
+          }
+        : state.run,
+    };
+
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
+
+    expect(state.scene).toBe("nodeMap");
+    expect(state.reward).toBeUndefined();
+    expect(state.run?.progress.currentFloor).toBe(2);
+  });
+
+  it("allows leaving a shop when every shop relic is already maxed", () => {
+    const controller = new GameFlowController(new SeededRandomProvider(24), new MemoryRepository());
+    let state = withOwnedRewards(controller.startRun(), shopRelicRewardTable);
+    state = {
+      ...state,
+      run: state.run
+        ? {
+            ...state.run,
+            currentNodeId: "floor_4",
+            progress: { ...state.run.progress, currentFloor: 4 },
+          }
+        : state.run,
+    };
+
+    state = controller.enterNode(state, state.run?.currentNodeId ?? "");
+
+    expect(state.scene).toBe("shop");
+    expect(state.reward?.choices).toEqual([]);
+
+    state = controller.completeCurrentNode(state);
+
+    expect(state.scene).toBe("nodeMap");
+    expect(state.run?.progress.currentFloor).toBe(5);
+  });
 });
 
 function defeatEnemyWithTetrises(controller: GameFlowController, state: GameAppState): GameAppState {
@@ -95,4 +156,10 @@ function defeatEnemyWithTetrises(controller: GameFlowController, state: GameAppS
     ? { ...state, combat: { ...state.combat, enemy: { ...state.combat.enemy, hp: 1 } } }
     : state;
   return controller.debugLineClear(weakened, 4);
+}
+
+function withOwnedRewards(state: GameAppState, rewards: typeof relicRewardTable): GameAppState {
+  if (!state.run) return state;
+  const relicInventory = rewards.reduce((inventory, reward) => inventory.add(String(reward.relicId)), state.run.relicInventory);
+  return { ...state, run: { ...state.run, relicInventory } };
 }

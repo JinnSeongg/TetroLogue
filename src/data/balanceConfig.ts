@@ -93,7 +93,7 @@ export const balanceConfig = {
   garbage: {
     minIntentEveryActions: 3,
     maxIntentEveryActions: 60,
-    defaultGarbageDelayActions: 2,
+    defaultGarbageDelayActions: 1,
     baseGpmToIntentConversion: 24,
     minGarbageLines: 1,
     maxGarbageLines: 8,

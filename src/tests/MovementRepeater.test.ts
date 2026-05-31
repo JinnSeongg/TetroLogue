@@ -3,7 +3,7 @@ import { MovementRepeater } from "../application/input/MovementRepeater";
 import { createInputState, pressHorizontal, pressSoftDrop, releaseHorizontal, releaseSoftDrop } from "../application/input/InputState";
 import { defaultPlayerSettings } from "../application/settings/PlayerSettings";
 
-const settings = { ...defaultPlayerSettings, input: { ...defaultPlayerSettings.input, dasMs: 100, arrMs: 40 } };
+const settings = { ...defaultPlayerSettings, input: { ...defaultPlayerSettings.input, dasMs: 100, arrMs: 40, softDropGravityMs: 20 } };
 
 const holdRightAt = (nowMs: number) => pressHorizontal(createInputState(), "right", nowMs).state;
 
@@ -89,12 +89,27 @@ describe("MovementRepeater", () => {
     expect(result.moves).toEqual(["left"]);
   });
 
-  it("repeats soft drop at the configured interval", () => {
+  it("starts soft drop immediately and then repeats at the configured interval", () => {
     const input = pressSoftDrop(createInputState(), 0);
     const repeater = new MovementRepeater();
 
+    const first = repeater.next(input, 0, settings);
+    const beforeInterval = repeater.next(first.inputState, 19, settings);
+    const atInterval = repeater.next(beforeInterval.inputState, 20, settings);
+    const second = repeater.next(atInterval.inputState, 65, settings);
+
+    expect(first.softDropSteps).toBe(1);
+    expect(beforeInterval.softDropSteps).toBe(0);
+    expect(atInterval.softDropSteps).toBe(1);
+    expect(second.softDropSteps).toBe(2);
+  });
+
+  it("does not duplicate the immediate soft drop consumed on keydown", () => {
+    const input = { ...pressSoftDrop(createInputState(), 0), lastSoftDropAt: 0 };
+    const repeater = new MovementRepeater();
+
     const beforeInterval = repeater.next(input, 19, settings);
-    const first = repeater.next(input, 20, settings);
+    const first = repeater.next(beforeInterval.inputState, 20, settings);
     const second = repeater.next(first.inputState, 65, settings);
 
     expect(beforeInterval.softDropSteps).toBe(0);
@@ -109,7 +124,7 @@ describe("MovementRepeater", () => {
     const result = new MovementRepeater().next(input, 100, settings);
 
     expect(result.moves).toEqual(["right"]);
-    expect(result.softDropSteps).toBe(5);
+    expect(result.softDropSteps).toBe(6);
   });
 
   it("resets soft drop repeat state when the key is released", () => {

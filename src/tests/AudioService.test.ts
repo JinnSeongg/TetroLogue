@@ -175,6 +175,7 @@ function feedback(overrides: Partial<CombatFeedbackEvent> = {}): CombatFeedbackE
     clearName: "None",
     clearedLines: 0,
     attackAmount: 0,
+    damageDealtToEnemy: 0,
     offsetAmount: 0,
     comboCount: 0,
     isComboActive: false,

@@ -73,12 +73,7 @@ export class GameFlowController {
             run: { ...state.run, status: "combat" },
           })
         : node.type === "event"
-        ? {
-            ...entered,
-            scene: "reward" as const,
-            run: { ...state.run, status: "event" as const },
-            reward: { choices: new RewardGenerator(relicRewardTable, this.random).generate(3, state.run.relicInventory) },
-          }
+        ? this.enterEventNode(entered, state)
         : {
             ...entered,
             scene: "shop" as const,
@@ -135,5 +130,16 @@ export class GameFlowController {
 
   private save(state: GameAppState): void {
     if (state.scene !== "mainMenu") new SaveRunUseCase(this.repository).execute(state);
+  }
+
+  private enterEventNode(entered: GameAppState, state: GameAppState): GameAppState {
+    const choices = new RewardGenerator(relicRewardTable, this.random).generate(3, state.run!.relicInventory);
+    const rewardState: GameAppState = {
+      ...entered,
+      scene: "reward",
+      run: { ...state.run!, status: "event" },
+      reward: { choices },
+    };
+    return choices.length > 0 ? rewardState : new CompleteCurrentNodeUseCase().execute(rewardState);
   }
 }

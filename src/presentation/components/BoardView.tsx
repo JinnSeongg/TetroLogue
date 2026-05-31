@@ -9,6 +9,7 @@ type Props = {
   activePiece?: ActivePiece;
   showGhostPiece?: boolean;
   showGrid?: boolean;
+  activePieceOpacity?: number;
   visualClassName?: string;
 };
 
@@ -17,6 +18,7 @@ export function BoardView({
   activePiece,
   showGhostPiece = true,
   showGrid = true,
+  activePieceOpacity,
   visualClassName = "",
 }: Props) {
   const ghostPiece = showGhostPiece ? new GhostPieceCalculator().calculate(board, activePiece) : undefined;
@@ -87,14 +89,8 @@ export function BoardView({
               ...(color
                 ? {
                     background: color.fill,
-                    border: "none",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    boxShadow: `
-                      inset -1px 0 0 #0b0e11,
-                      inset 0 -1px 0 #0b0e11,
-                      0 0 6px ${color.glow}
-                    `,
+                    boxShadow: `inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 6px ${color.glow}`,
+                    opacity: activePieceOpacity,
                   }
                 : undefined),
             }}

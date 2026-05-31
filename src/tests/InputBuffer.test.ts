@@ -100,6 +100,7 @@ describe("InputBuffer", () => {
     const result = new BrowserKeyboardStateAdapter().apply(createInputState(), { type: "keydown", key: "ArrowDown" }, 0);
 
     expect(result.immediateInput).toBeUndefined();
+    expect(result.immediateSoftDropSteps).toBe(1);
     expect(result.inputState.softDropPressed).toBe(true);
   });
 

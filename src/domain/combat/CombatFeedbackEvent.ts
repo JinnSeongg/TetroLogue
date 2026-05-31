@@ -12,6 +12,7 @@ export type CombatFeedbackEvent = {
   clearName: string;
   clearedLines: number;
   attackAmount: number;
+  damageDealtToEnemy: number;
   offsetAmount: number;
   comboCount: number;
   isComboActive: boolean;
@@ -31,6 +32,7 @@ export type CreateCombatFeedbackEventInput = {
   attackResult?: AttackResult;
   comboB2BResult?: ComboB2BResult;
   dangerState?: CombatFeedbackDangerState;
+  damageDealtToEnemy?: number;
   offsetAmount?: number;
 };
 
@@ -42,6 +44,7 @@ export function createDefaultCombatFeedbackEvent(): CombatFeedbackEvent {
     clearName: "None",
     clearedLines: 0,
     attackAmount: 0,
+    damageDealtToEnemy: 0,
     offsetAmount: 0,
     comboCount: 0,
     isComboActive: false,

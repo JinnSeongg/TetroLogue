@@ -42,8 +42,8 @@ function withWeakEnemyAndPendingGarbage(state: GameAppState, pendingGarbage: num
         hp: 1,
         pendingGarbage,
         garbageQueue: new GarbageQueue(
-          { defaultDelay: 0 },
-          [{ id: "test_pending", amount: pendingGarbage, source: "test", remainingDelay: 99 }],
+          { entryDelayMs: 2500 },
+          [{ id: "test_pending", amount: pendingGarbage, source: "test", createdAtMs: 0, readyAtMs: 3500 }],
         ),
       },
     },

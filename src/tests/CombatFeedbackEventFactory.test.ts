@@ -31,6 +31,7 @@ describe("CombatFeedbackEventFactory", () => {
     expect(event.sequenceId).toBeGreaterThan(0);
     expect(event.clearName).toBe("None");
     expect(event.attackAmount).toBe(0);
+    expect(event.damageDealtToEnemy).toBe(0);
     expect(event.dangerLevel).toBe("Safe");
     expect(event.intensity).toBe("none");
   });
@@ -43,6 +44,7 @@ describe("CombatFeedbackEventFactory", () => {
       attackResult,
       comboB2BResult,
       dangerState: { dangerLevel: "Warning" },
+      damageDealtToEnemy: 3,
       offsetAmount: 2,
     });
 
@@ -50,6 +52,7 @@ describe("CombatFeedbackEventFactory", () => {
       clearName: "Tetris",
       clearedLines: 4,
       attackAmount: 4,
+      damageDealtToEnemy: 3,
       offsetAmount: 2,
       comboCount: 3,
       isComboActive: true,

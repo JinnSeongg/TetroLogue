@@ -88,6 +88,56 @@ describe("Relic modifiers", () => {
     expect(fast).toBe(5);
   });
 
+  it("applies compressed_preview as an unconditional attack multiplier", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.compressed_preview], {
+      linesCleared: 1,
+      backToBackActive: false,
+    });
+
+    expect(result).toBe(5);
+  });
+
+  it("applies no_hold_focus as an unconditional attack multiplier", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.no_hold_focus], {
+      linesCleared: 1,
+      backToBackActive: false,
+    });
+
+    expect(result).toBe(6);
+  });
+
+  it("applies forced_speed as an unconditional attack multiplier", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.forced_speed], {
+      linesCleared: 1,
+      backToBackActive: false,
+    });
+
+    expect(result).toBe(5);
+  });
+
+  it("applies overheated_drop as an unconditional attack multiplier", () => {
+    const result = new EffectResolver().applyAttackModifiers(20, [relicDefinitions.overheated_drop], {
+      linesCleared: 1,
+      backToBackActive: false,
+    });
+
+    expect(result).toBe(27);
+  });
+
+  it("applies quick_judgement attack multiplier only for B2B attacks", () => {
+    const inactive = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.quick_judgement], {
+      linesCleared: 1,
+      backToBackActive: false,
+    });
+    const active = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.quick_judgement], {
+      linesCleared: 1,
+      backToBackActive: true,
+    });
+
+    expect(inactive).toBe(4);
+    expect(active).toBe(5);
+  });
+
   it("applies holdless_focus only before hold is used this battle", () => {
     const resolver = new EffectResolver();
     const beforeHold = resolver.applyAttackModifiers(4, [relicDefinitions.holdless_focus], {
@@ -292,6 +342,95 @@ describe("Relic modifiers", () => {
     expect(missingDanger).toBe(4);
   });
 
+  it("applies whenAny when one condition set matches", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [eitherTetrisOrSpinRelic], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: true,
+    });
+
+    expect(result).toBe(5);
+  });
+
+  it("does not apply whenAny when no condition set matches", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [eitherTetrisOrSpinRelic], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+
+    expect(result).toBe(4);
+  });
+
+  it("requires when and at least one whenAny condition set when both are present", () => {
+    const active = new EffectResolver().applyAttackModifiers(4, [dangerTetrisOrSpinRelic], {
+      linesCleared: 4,
+      backToBackActive: false,
+      isDanger: true,
+      isTSpin: false,
+    });
+    const missingAny = new EffectResolver().applyAttackModifiers(4, [dangerTetrisOrSpinRelic], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isDanger: true,
+      isTSpin: false,
+    });
+    const missingWhen = new EffectResolver().applyAttackModifiers(4, [dangerTetrisOrSpinRelic], {
+      linesCleared: 4,
+      backToBackActive: false,
+      isDanger: false,
+      isTSpin: false,
+    });
+
+    expect(active).toBe(5);
+    expect(missingAny).toBe(4);
+    expect(missingWhen).toBe(4);
+  });
+
+  it("applies high_stack_counter for Danger Tetris", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+      linesCleared: 4,
+      backToBackActive: false,
+      isDanger: true,
+      isTSpin: false,
+    });
+
+    expect(result).toBe(5);
+  });
+
+  it("applies high_stack_counter for Danger T-spin", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isDanger: true,
+      isTSpin: true,
+    });
+
+    expect(result).toBe(5);
+  });
+
+  it("does not apply high_stack_counter outside Danger", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+      linesCleared: 4,
+      backToBackActive: false,
+      isDanger: false,
+      isTSpin: true,
+    });
+
+    expect(result).toBe(4);
+  });
+
+  it("applies combo_attack when comboBonus is at least 1", () => {
+    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_attack], {
+      linesCleared: 4,
+      backToBackActive: false,
+      combo: 0,
+      comboBonus: 1,
+    });
+
+    expect(result).toBe(5);
+  });
+
   it("fails safely for unknown context keys and invalid numeric comparisons", () => {
     const unknownContextRelic = {
       id: "unknown_context",
@@ -344,4 +483,27 @@ const holePressureRelic: RelicDefinition = {
   description: "Test fixture.",
   ...testRelicMeta,
   modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { isDanger: true, holeCount: { gte: 3 } } }],
+};
+
+const eitherTetrisOrSpinRelic: RelicDefinition = {
+  id: "either_tetris_or_spin",
+  name: "Either Tetris Or Spin",
+  description: "Test fixture.",
+  ...testRelicMeta,
+  modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, whenAny: [{ linesCleared: 4 }, { isTSpin: true }] }],
+};
+
+const dangerTetrisOrSpinRelic: RelicDefinition = {
+  id: "danger_tetris_or_spin",
+  name: "Danger Tetris Or Spin",
+  description: "Test fixture.",
+  ...testRelicMeta,
+  modifiers: [
+    {
+      trigger: "onAttackCalculated",
+      attackMultiplier: 1.25,
+      when: { isDanger: true },
+      whenAny: [{ linesCleared: 4 }, { isTSpin: true }],
+    },
+  ],
 };

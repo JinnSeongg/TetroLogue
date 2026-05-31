@@ -20,6 +20,8 @@ describe("Relic reward tables", () => {
   it("includes shopOnly relics in the shop reward table", () => {
     expect(shopRelicIds()).toContain("gentle_fall");
     expect(shopRelicIds()).toContain("holdless_focus");
+    expect(shopRelicIds()).toContain("wide_next");
+    expect(shopRelicIds()).toContain("forced_speed");
   });
 
   it("excludes disabled legacy relics from every reward table", () => {

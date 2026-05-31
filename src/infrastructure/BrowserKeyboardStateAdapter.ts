@@ -13,6 +13,7 @@ export type BrowserKeyboardStateEvent = {
 export type BrowserKeyboardStateResult = {
   inputState: InputState;
   immediateInput?: PlayerInput;
+  immediateSoftDropSteps?: number;
 };
 
 export class BrowserKeyboardStateAdapter {
@@ -41,7 +42,11 @@ export class BrowserKeyboardStateAdapter {
     }
 
     if (input === "softDrop") {
-      return { inputState: pressSoftDrop(inputState, nowMs) };
+      if (inputState.softDropPressed) return { inputState };
+      return {
+        inputState: { ...pressSoftDrop(inputState, nowMs), lastSoftDropAt: nowMs },
+        immediateSoftDropSteps: 1,
+      };
     }
 
     return { inputState: this.press(inputState, input), immediateInput: input };

@@ -3,7 +3,6 @@ import { BoardView } from "./BoardView";
 import { CombatHUD } from "./CombatHUD";
 import { HoldRenderer } from "./HoldRenderer";
 import { QueueRenderer } from "./QueueRenderer";
-import { FastChainIndicator } from "./FastChainIndicator";
 import { RelicPanel } from "./RelicPanel";
 import type { PlayerSettings } from "../../application/settings/PlayerSettings";
 import { CombatFeedbackPanel } from "./CombatFeedbackPanel";
@@ -23,8 +22,9 @@ type Props = {
 
 export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode, settings }: Props) {
   const combat = state.combat;
-  const garbagePreview = combat?.enemy.garbageQueue.getPreview();
+  const garbagePreview = combat?.enemy.garbageQueue.getPreview(performance.now());
   const floor = state.run?.progress.currentFloor;
+  const activePieceOpacity = combat ? lockDelayOpacity(combat.player.isGrounded, combat.player.lockElapsedMs, combat.ruleSet.lockDelayMs) : undefined;
   return (
     <AttackAnimationController event={combat?.lastFeedbackEvent}>
       {(attackAnimation) => (
@@ -58,6 +58,7 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
                               activePiece={combat.player.activePiece}
                               showGhostPiece={settings.video.ghostPieceEnabled}
                               showGrid={settings.video.gridVisible}
+                              activePieceOpacity={activePieceOpacity}
                               visualClassName={dangerVisual.boardClassName}
                             />
                           </div>
@@ -65,7 +66,6 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
                       </section>
                       <aside className="combat-right">
                         <QueueRenderer nextPieces={combat?.player.nextPieces ?? []} />
-                        <FastChainIndicator fastChainCount={combat?.player.fastChainCount} isFastState={combat?.player.isFastState} />
                         <CombatFeedbackPanel event={combat?.lastFeedbackEvent} visibleMs={2200} />
                         {devMode ? (
                           <section className="panel">
@@ -91,4 +91,10 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
       )}
     </AttackAnimationController>
   );
+}
+
+function lockDelayOpacity(isGrounded: boolean, lockElapsedMs: number, lockDelayMs: number): number | undefined {
+  if (!isGrounded || lockDelayMs <= 0) return undefined;
+  const progress = Math.min(1, Math.max(0, lockElapsedMs / lockDelayMs));
+  return 0.6 + progress * 0.4;
 }

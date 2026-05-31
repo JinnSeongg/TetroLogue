@@ -57,10 +57,22 @@ describe("BrowserKeyboardStateAdapter", () => {
     const up = adapter.apply(down.inputState, { type: "keyup", key: "ArrowDown" }, 20);
 
     expect(down.immediateInput).toBeUndefined();
+    expect(down.immediateSoftDropSteps).toBe(1);
     expect(down.inputState.softDropPressed).toBe(true);
     expect(down.inputState.softDropPressedAt).toBe(0);
+    expect(down.inputState.lastSoftDropAt).toBe(0);
     expect(up.inputState.softDropPressed).toBe(false);
     expect(up.inputState.softDropPressedAt).toBeUndefined();
+  });
+
+  it("does not create another immediate soft drop while the key is already pressed", () => {
+    const adapter = new BrowserKeyboardStateAdapter();
+
+    const down = adapter.apply(createInputState(), { type: "keydown", key: "ArrowDown" }, 0);
+    const duplicate = adapter.apply(down.inputState, { type: "keydown", key: "ArrowDown" }, 10);
+
+    expect(down.immediateSoftDropSteps).toBe(1);
+    expect(duplicate.immediateSoftDropSteps).toBeUndefined();
   });
 
   it("tracks held hold and rotation keys for initial actions", () => {

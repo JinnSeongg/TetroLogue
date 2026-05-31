@@ -44,11 +44,16 @@ export type PlayerSettings = {
   };
 };
 
+export const softDropGravityMsRange = {
+  min: 30,
+  max: 120,
+} as const;
+
 export const defaultPlayerSettings: PlayerSettings = {
   input: {
     dasMs: 150,
     arrMs: 45,
-    softDropGravityMs: 20,
+    softDropGravityMs: softDropGravityMsRange.min,
     keyBindings: {
       moveLeft: ["ArrowLeft"],
       moveRight: ["ArrowRight"],
@@ -80,7 +85,12 @@ export const sanitizePlayerSettings = (value: unknown): PlayerSettings => {
   const candidate = value as Partial<PlayerSettings>;
   const dasMs = clampNumber(candidate.input?.dasMs, 60, 400, defaultPlayerSettings.input.dasMs);
   const arrMs = clampNumber(candidate.input?.arrMs, 0, 120, defaultPlayerSettings.input.arrMs);
-  const softDropGravityMs = clampNumber(candidate.input?.softDropGravityMs, 1, 120, defaultPlayerSettings.input.softDropGravityMs);
+  const softDropGravityMs = clampNumber(
+    candidate.input?.softDropGravityMs,
+    softDropGravityMsRange.min,
+    softDropGravityMsRange.max,
+    defaultPlayerSettings.input.softDropGravityMs,
+  );
 
   return {
     ...defaultPlayerSettings,

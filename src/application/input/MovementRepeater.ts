@@ -48,8 +48,9 @@ export class MovementRepeater {
 function repeatSoftDrop(input: InputState, nowMs: number, settings: PlayerSettings): { inputState: InputState; steps: number } {
   if (!input.softDropPressed || input.softDropPressedAt === undefined) return { inputState: { ...input, lastSoftDropAt: undefined }, steps: 0 };
   const intervalMs = Math.max(1, settings.input.softDropGravityMs);
-  let nextDropAt = (input.lastSoftDropAt ?? input.softDropPressedAt) + intervalMs;
-  let steps = 0;
+  const previousDropAt = input.lastSoftDropAt ?? input.softDropPressedAt;
+  let nextDropAt = previousDropAt + intervalMs;
+  let steps = input.lastSoftDropAt === undefined ? 1 : 0;
   while (nextDropAt <= nowMs && steps < INSTANT_ARR_MOVE_BUDGET) {
     steps += 1;
     nextDropAt += intervalMs;

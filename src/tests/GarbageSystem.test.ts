@@ -22,25 +22,59 @@ describe("garbage pressure", () => {
 
   it("inserts garbage and pushes existing rows up when due", () => {
     const random = new SeededRandomProvider(41);
-    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 1, 1);
+    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 1, 3500);
 
-    const next = new ResolveLineClearUseCase(random).execute(state, 0);
+    const next = new ResolveLineClearUseCase(random).execute(state, 0, undefined, undefined, undefined, 3500);
     const bottom = next.combat?.player.board.snapshot()[19] ?? [];
 
     expect(bottom.filter((cell) => cell.filled)).toHaveLength(9);
     expect(next.events.some((event) => event.type === "GarbageApplied")).toBe(true);
   });
 
+  it("does not insert garbage before readyAtMs", () => {
+    const random = new SeededRandomProvider(48);
+    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 3, 3500);
+
+    const next = new ResolveLineClearUseCase(random).execute(state, 0, undefined, undefined, undefined, 3000);
+
+    expect(next.events.some((event) => event.type === "GarbageApplied")).toBe(false);
+    expect(next.combat?.enemy.garbageQueue.getTotalAmount()).toBe(3);
+  });
+
+  it("does not insert pending garbage on a lock that clears lines", () => {
+    const random = new SeededRandomProvider(46);
+    const state = withDurableEnemy(withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 3, 1000));
+
+    const next = new ResolveLineClearUseCase(random).execute(state, 1, undefined, undefined, undefined, 1000);
+    const bottom = next.combat?.player.board.snapshot()[19] ?? [];
+
+    expect(bottom.filter((cell) => cell.filled)).toHaveLength(0);
+    expect(next.combat?.enemy.garbageQueue.getTotalAmount()).toBeGreaterThan(0);
+    expect(next.events.some((event) => event.type === "GarbageApplied")).toBe(false);
+  });
+
+  it("applies at most four ready garbage lines on a non-clear lock", () => {
+    const random = new SeededRandomProvider(47);
+    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 10, 1000);
+
+    const next = new ResolveLineClearUseCase(random).execute(state, 0, undefined, undefined, undefined, 1000);
+    const garbageRows = next.combat?.player.board.snapshot().slice(16) ?? [];
+
+    expect(garbageRows.every((row) => row.filter((cell) => cell.filled).length === 9)).toBe(true);
+    expect(next.combat?.enemy.pendingGarbage).toBe(6);
+    expect(next.combat?.enemy.garbageQueue.getTotalAmount()).toBe(6);
+  });
+
   it("defeats the player when garbage overflows the board", () => {
     const random = new SeededRandomProvider(42);
-    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 1, 1);
+    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 1, 1000);
     const fullTopBoard = state.combat!.player.board.withFilledRow(0);
     const overflowState = {
       ...state,
       combat: { ...state.combat!, player: { ...state.combat!.player, board: fullTopBoard } },
     };
 
-    const next = new ResolveLineClearUseCase(random).execute(overflowState, 0);
+    const next = new ResolveLineClearUseCase(random).execute(overflowState, 0, undefined, undefined, undefined, 1000);
 
     expect(next.scene).toBe("runResult");
     expect(next.runResult?.result).toBe("defeat");
@@ -48,7 +82,7 @@ describe("garbage pressure", () => {
 
   it("cancels pending garbage before any remaining damage reaches the enemy", () => {
     const random = new SeededRandomProvider(43);
-    const state = withDurableEnemy(withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 4, 99));
+    const state = withDurableEnemy(withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 4, 3500));
     const enemyHp = state.combat?.enemy.hp ?? 0;
 
     const next = new ResolveLineClearUseCase(random).execute(state, 4);
@@ -60,7 +94,7 @@ describe("garbage pressure", () => {
 
   it("reduces pending garbage and deals no damage when attack is too small", () => {
     const random = new SeededRandomProvider(44);
-    const state = withDurableEnemy(withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 4, 99));
+    const state = withDurableEnemy(withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 4, 3500));
     const enemyHp = state.combat?.enemy.hp ?? 0;
 
     const next = new ResolveLineClearUseCase(random).execute(state, 1);
@@ -69,17 +103,6 @@ describe("garbage pressure", () => {
     expect(next.combat?.enemy.hp).toBe(enemyHp);
   });
 
-  it("decreases garbage delay even on locks with no line clear", () => {
-    const random = new SeededRandomProvider(45);
-    const state = withPendingGarbage(new StartCombatUseCase(random).execute(new StartRunUseCase().execute()), 1, 2);
-
-    const next = new ResolveLineClearUseCase(random).execute(state, 0);
-
-    expect(next.combat?.enemy.garbageQueue.getPackets()).toEqual([
-      { id: "garbage_1", amount: 1, source: "test_intent", remainingDelay: 1 },
-    ]);
-    expect(next.events.some((event) => event.type === "GarbageApplied")).toBe(false);
-  });
 });
 
 function withLineGuard(state: GameAppState): GameAppState {
@@ -113,7 +136,7 @@ function withDurableEnemy(state: GameAppState): GameAppState {
   };
 }
 
-function withPendingGarbage(state: GameAppState, pendingGarbage: number, dueActionCount: number): GameAppState {
+function withPendingGarbage(state: GameAppState, pendingGarbage: number, readyAtMs: number): GameAppState {
   if (!state.combat) return state;
   return {
     ...state,
@@ -123,13 +146,13 @@ function withPendingGarbage(state: GameAppState, pendingGarbage: number, dueActi
         ...state.combat.enemy,
         pendingGarbage,
         garbageQueue: new GarbageQueue(
-          { defaultDelay: dueActionCount },
-          [{ id: "garbage_1", amount: pendingGarbage, source: "test_intent", remainingDelay: dueActionCount }],
+          { entryDelayMs: 2500 },
+          [{ id: "garbage_1", amount: pendingGarbage, source: "test_intent", createdAtMs: 1000, readyAtMs }],
         ),
         currentIntent: {
           id: "test_intent",
           description: "Test garbage",
-          dueActionCount,
+          dueActionCount: 0,
           garbageLines: pendingGarbage,
         },
       },

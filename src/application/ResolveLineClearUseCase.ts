@@ -20,6 +20,7 @@ import { createInitialCombatTelemetry } from "../domain/combat/BattleResultSumma
 import type { CombatState } from "../domain/combat/CombatState";
 import { triggerCombatGameOver } from "./CombatGameOver";
 import { EffectResolver } from "../domain/relic/EffectResolver";
+import { CompleteCurrentNodeUseCase } from "./CompleteCurrentNodeUseCase";
 
 export class ResolveLineClearUseCase {
   constructor(
@@ -33,6 +34,7 @@ export class ResolveLineClearUseCase {
     spinResult: SpinResult = noSpinResult(),
     isPerfectClear = false,
     clearResult: ClearResult = createClearResult({ linesCleared, spinResult, isPerfectClear }),
+    nowMs = 0,
   ): GameAppState {
     if (!state.combat || !state.run || state.combat.result !== "ongoing") return state;
     if (!state.combat.player.activePiece) {
@@ -47,10 +49,10 @@ export class ResolveLineClearUseCase {
     });
     const attackFieldState = new FieldAnalyzer().analyze(state.combat.player.board);
     const garbageQueue = new GarbageQueue(
-      { defaultDelay: state.combat.enemy.calculatedStats?.garbageDelayActions ?? garbageConfig.defaultIncomingGarbageDelay },
+      { entryDelayMs: garbageConfig.garbageEntryDelayMs },
       state.combat.enemy.garbageQueue?.getPackets() ??
         (state.combat.enemy.pendingGarbage
-          ? [{ id: "garbage_1", amount: state.combat.enemy.pendingGarbage, source: "legacy_pending", remainingDelay: 0 }]
+          ? [{ id: "garbage_1", amount: state.combat.enemy.pendingGarbage, source: "legacy_pending", createdAtMs: 0, readyAtMs: 0 }]
           : []),
     );
     const relicAttack = new EffectResolver().applyAttackModifiers(
@@ -93,21 +95,21 @@ export class ResolveLineClearUseCase {
       backToBackCount: state.combat.player.backToBackCount,
     }, this.comboB2BConfig).next(clearResult);
     const nextActionCount = state.combat.player.actionCount + 1;
-    garbageQueue.tickDelay();
-    const readyPackets = garbageQueue.popReadyPackets();
+    const readyPackets = linesCleared === 0 ? garbageQueue.popReadyLines(garbageConfig.maxGarbageApplyPerLock, nowMs) : [];
     const garbageResult = new GarbageApplier().apply(state.combat.player.board, readyPackets, this.random);
     const boardAfterGarbage = garbageResult.appliedLines > 0 ? garbageResult.board : state.combat.player.board;
     const garbageDefeat = garbageResult.appliedLines > 0 && garbageResult.overflow;
     const dangerState = new FieldAnalyzer().analyze(boardAfterGarbage);
+    const nextEnemyHp = Math.max(0, state.combat.enemy.hp - damage);
+    const damageDealtToEnemy = Math.min(state.combat.enemy.hp, damage);
     const feedbackEvent = new CombatFeedbackEventFactory().create({
       clearResult,
       attackResult: attack,
       comboB2BResult,
       dangerState,
+      damageDealtToEnemy,
       offsetAmount: cancelResult.cancelledGarbage,
     });
-    const nextEnemyHp = Math.max(0, state.combat.enemy.hp - damage);
-    const damageDealtToEnemy = Math.min(state.combat.enemy.hp, damage);
     const result = nextEnemyHp <= 0 ? "victory" : "ongoing";
     const currentNode = getCurrentNode(state.run.progress);
     const runWon = result === "victory" && currentNode?.type === "finalBoss";
@@ -116,7 +118,7 @@ export class ResolveLineClearUseCase {
       ? new EnemyPatternSystem().nextIntent(state.combat.enemy.definition, nextActionCount, state.combat.enemy.calculatedStats)
       : undefined;
     if (generatedIntent?.garbageLines) {
-      garbageQueue.enqueue(generatedIntent.garbageLines, generatedIntent.id);
+      garbageQueue.enqueue(generatedIntent.garbageLines, generatedIntent.id, nowMs);
     }
     const nextTelemetry = updateCombatTelemetry({
       combat: state.combat,
@@ -141,10 +143,8 @@ export class ResolveLineClearUseCase {
             finalBoardHeight: dangerState.maxHeight,
             result: finalResult === "victory" ? "win" : "loss",
           });
-    const reward =
-      finalResult === "victory" && !runWon
-        ? { choices: new RewardGenerator(relicRewardTable, this.random).generate(3, state.run.relicInventory) }
-        : state.reward;
+    const rewardChoices = finalResult === "victory" && !runWon ? new RewardGenerator(relicRewardTable, this.random).generate(3, state.run.relicInventory) : [];
+    const reward = finalResult === "victory" && !runWon && rewardChoices.length > 0 ? { choices: rewardChoices } : state.reward;
     const combatEvents: GameEvent[] = [
       { type: "SpinDetected" as const, spinResult },
       ...(linesCleared > 0 ? [{ type: "LineCleared" as const, lines: linesCleared, spinResult, clearResult }] : []),
@@ -231,9 +231,10 @@ export class ResolveLineClearUseCase {
       reward,
       events: [...state.events, ...combatEvents],
     };
-    return activePieceBlocked
-      ? triggerCombatGameOver(nextState, "spawnCollision", ["cannot place spawned piece", "gameOver triggered by spawn collision"], state.combat.player.activePiece)
-      : nextState;
+    if (activePieceBlocked) {
+      return triggerCombatGameOver(nextState, "spawnCollision", ["cannot place spawned piece", "gameOver triggered by spawn collision"], state.combat.player.activePiece);
+    }
+    return finalResult === "victory" && !runWon && rewardChoices.length === 0 ? new CompleteCurrentNodeUseCase().execute(nextState) : nextState;
   }
 }
 

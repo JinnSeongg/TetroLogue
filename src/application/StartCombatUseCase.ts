@@ -87,7 +87,7 @@ export class StartCombatUseCase {
           maxHp: calculatedStats.maxHp,
           calculatedStats,
           pendingGarbage: 0,
-          garbageQueue: new GarbageQueue({ defaultDelay: calculatedStats.garbageDelayActions ?? garbageConfig.defaultIncomingGarbageDelay }),
+          garbageQueue: new GarbageQueue({ entryDelayMs: garbageConfig.garbageEntryDelayMs }),
         },
         ruleSet: currentCombatRuleSet,
         ruleSetModifierDebug: {

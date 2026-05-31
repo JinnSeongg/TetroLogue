@@ -87,7 +87,7 @@ export class LockActivePieceUseCase {
 
     return new ResolveLineClearUseCase(this.random, {
       keepBackToBackOnEmptyTSpin: this.ruleSet.keepBackToBackOnEmptyTSpin,
-    }).execute(afterLock, locked.linesCleared, locked.spinResult, locked.clearResult.isPerfectClear, locked.clearResult);
+    }).execute(afterLock, locked.linesCleared, locked.spinResult, locked.clearResult.isPerfectClear, locked.clearResult, nowMs);
   }
 }
 

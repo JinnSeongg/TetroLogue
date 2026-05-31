@@ -14,17 +14,21 @@ export function ShopScreen({ reward, relics, onSelect, onLeave }: Props) {
       <section className="reward-panel">
         <p className="eyebrow">Shop</p>
         <h1>Pick a Relic</h1>
-        <div className="reward-card-grid">
-          {(reward?.choices ?? []).map((choice) => {
-            const relic = relics[choice.relicId];
-            return (
-              <button className="reward-card shop-card" key={choice.id} onClick={() => onSelect(choice.id)}>
-                <strong>{choice.label}</strong>
-                <span>{relic?.description ?? "Adds a new modifier."}</span>
-              </button>
-            );
-          })}
-        </div>
+        {(reward?.choices.length ?? 0) === 0 ? (
+          <p className="empty-reward-message">구매 가능한 유물이 없습니다.</p>
+        ) : (
+          <div className="reward-card-grid">
+            {(reward?.choices ?? []).map((choice) => {
+              const relic = relics[choice.relicId];
+              return (
+                <button className="reward-card shop-card" key={choice.id} onClick={() => onSelect(choice.id)}>
+                  <strong>{choice.label}</strong>
+                  <span>{relic?.description ?? "Adds a new modifier."}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div className="shop-actions">
           <button onClick={onLeave}>Leave Shop</button>
         </div>

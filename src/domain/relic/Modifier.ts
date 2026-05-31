@@ -41,7 +41,8 @@ export type AttackModifier = {
   trigger: "onAttackCalculated";
   addAttack?: number;
   attackMultiplier?: number;
-  when: ModifierConditionSet;
+  when?: ModifierConditionSet;
+  whenAny?: ModifierConditionSet[];
 };
 
 export type PassiveModifier = {
@@ -57,12 +58,20 @@ export type PassiveModifier = {
 export type Modifier = AttackModifier | PassiveModifier;
 
 export const modifierApplies = (modifier: AttackModifier, context: ModifierContext): boolean => {
-  return Object.entries(modifier.when).every(([key, condition]) => {
-    if (condition === undefined) return true;
+  const whenMatches = modifier.when === undefined || conditionSetMatches(modifier.when, context);
+  const whenAnyMatches =
+    modifier.whenAny === undefined || modifier.whenAny.some((conditionSet) => conditionSetMatches(conditionSet, context));
+
+  return whenMatches && whenAnyMatches;
+};
+
+function conditionSetMatches(conditionSet: ModifierConditionSet, context: ModifierContext): boolean {
+  return Object.entries(conditionSet).every(([key, condition]) => {
+    if (condition === undefined) return false;
     const value = context[key as keyof ModifierContext];
     return conditionMatches(value, condition);
   });
-};
+}
 
 function conditionMatches(value: unknown, condition: unknown): boolean {
   if (typeof condition === "boolean" || typeof condition === "number") {

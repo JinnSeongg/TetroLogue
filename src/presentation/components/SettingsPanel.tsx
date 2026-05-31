@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   controlActions,
   defaultPlayerSettings,
+  softDropGravityMsRange,
   type ControlAction,
   type PlayerSettings,
 } from "../../application/settings/PlayerSettings";
@@ -117,8 +118,8 @@ export function SettingsPanel({ settings, onChange, onClose }: Props) {
             <NumberSetting label="ARR" min={0} max={120} step={5} value={settings.input.arrMs} suffix="ms" onChange={(value) => updateInput("arrMs", value)} />
             <NumberSetting
               label="Soft Drop Speed"
-              min={1}
-              max={120}
+              min={softDropGravityMsRange.min}
+              max={softDropGravityMsRange.max}
               step={1}
               value={settings.input.softDropGravityMs}
               suffix="ms"

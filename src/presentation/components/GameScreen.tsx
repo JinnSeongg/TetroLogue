@@ -102,10 +102,13 @@ export function GameScreen(props: Props) {
         nowMs,
       );
       event.preventDefault();
-      if (result.inputState === inputStateRef.current && !result.immediateInput) return;
+      if (result.inputState === inputStateRef.current && !result.immediateInput && !result.immediateSoftDropSteps) return;
       inputStateRef.current = result.inputState;
       if (result.immediateInput) {
         propsRef.current.onInput(result.immediateInput, nowMs, true, initialActionFromInputState(inputStateRef.current));
+      }
+      if (result.immediateSoftDropSteps) {
+        propsRef.current.onTickCombat(0, result.immediateSoftDropSteps, nowMs, initialActionFromInputState(inputStateRef.current));
       }
     };
     const onUp = (event: KeyboardEvent) => {

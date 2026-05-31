@@ -104,33 +104,39 @@ current * attackMultiplier + addAttack
 
 | id | name | category | rarity | 효과 요약 |
 | --- | --- | --- | --- | --- |
-| `tetris_power` | 장대 강화 | `tetris` | `common` | Tetris 피해 +25% |
-| `tetris_flat_bonus` | 완전 제거 보너스 | `tetris` | `common` | Tetris 추가 피해 +1 |
-| `tetris_overwhelm` | 네 줄의 압도 | `tetris` | `rare` | Tetris 피해 +50% |
-| `spin_pierce` | 회전 관통 | `spin` | `common` | T-spin 피해 +25% |
-| `mini_spin_bonus` | 기술 보정 | `spin` | `common` | T-spin Mini 추가 피해 +1 |
-| `b2b_flat_bonus` | 고급 공격술 | `b2b` | `common` | B2B 추가 피해 +1 |
-| `b2b_pressure` | 연속 압박 | `b2b` | `uncommon` | B2B 피해 +25% |
-| `combo_attack` | 연쇄 공격 | `combo` | `common` | Combo 2 이상 추가 피해 +1 |
-| `long_combo_flow` | 끝없는 흐름 | `combo` | `rare` | Combo 9 이상 추가 피해 +2 |
-| `danger_power` | 벼랑 끝 화력 | `danger` | `uncommon` | Danger 상태 공격 피해 +50% |
-| `high_stack_counter` | 상단 반격 | `danger` | `uncommon` | Danger 상태 Tetris 피해 +25% |
-| `hole_power` | 균열 활용 | `hole` | `common` | hole 3개 이상 공격 피해 +25% |
-| `broken_field_power` | 망가진 전장 | `hole` | `rare` | hole 5개 이상 공격 피해 +50% |
-| `fast_power` | 빠른 손 | `speed` | `common` | Fast 상태 공격 피해 +25% |
-| `fast_chain_power` | 속도 누적 | `speed` | `uncommon` | Fast Chain 3 이상 공격 피해 +25% |
-| `garbage_absorb` | 압박 흡수 | `garbage` | `common` | 대기 garbage 3줄 이상 공격 피해 +25% |
-| `garbage_surge` | 압박 고조 | `garbage` | `rare` | 대기 garbage 6줄 이상 공격 피해 +35% |
+| `tetris_power` | 테트리스 강화 | `tetris` | `common` | Tetris 공격 피해 +25% |
+| `tetris_flat_bonus` | 테트리스 추가타 | `tetris` | `common` | Tetris 공격에 추가 피해 +1 |
+| `tetris_overwhelm` | 강한 테트리스 | `tetris` | `rare` | Tetris 공격 피해 +50% |
+| `spin_pierce` | T-spin 강화 | `spin` | `common` | T-spin 공격 피해 +25% |
+| `mini_spin_bonus` | Mini Spin 추가타 | `spin` | `common` | T-spin Mini 공격에 추가 피해 +1 |
+| `b2b_flat_bonus` | B2B 추가타 | `b2b` | `common` | B2B 공격에 추가 피해 +1 |
+| `b2b_pressure` | B2B 공격 강화 | `b2b` | `uncommon` | B2B 공격 피해 +25% |
+| `combo_attack` | 콤보 보너스 증가 | `combo` | `common` | Combo 2 이상 또는 comboBonus 1 이상 추가 피해 +1 |
+| `long_combo_flow` | 9콤보 보너스 증가 | `combo` | `rare` | Combo 9 이상 추가 피해 +2 |
+| `danger_power` | Danger 공격 강화 | `danger` | `uncommon` | Danger 상태 공격 피해 +50% |
+| `high_stack_counter` | Danger 큰공격 강화 | `danger` | `uncommon` | Danger 상태의 Tetris 또는 T-spin 공격 피해 +25% |
+| `hole_power` | Hole 보유 공격 강화 | `hole` | `common` | hole 3개 이상 공격 피해 +25% |
+| `broken_field_power` | Hole 다수 공격 강화 | `hole` | `rare` | hole 5개 이상 공격 피해 +50% |
+| `fast_power` | Fast 공격 강화 | `speed` | `common` | Fast 상태 공격 피해 +25% |
+| `fast_chain_power` | FastChain 누적 강화 | `speed` | `uncommon` | Fast Chain 3 이상 공격 피해 +25% |
+| `garbage_absorb` | 대기 Garbage 강화 | `garbage` | `common` | 대기 garbage 3줄 이상 공격 피해 +25% |
+| `garbage_surge` | 대기 Garbage 누적 강화 | `garbage` | `rare` | 대기 garbage 6줄 이상 공격 피해 +35% |
 
 ### 상점 전용 유물
 
 | id | name | category | rarity | 효과 요약 |
 | --- | --- | --- | --- | --- |
-| `gentle_fall` | 완만한 낙하 | `rule` | `common` | gravity 간격 x1.2 |
-| `delayed_lock` | 지연 고정 | `rule` | `common` | lock delay +150ms |
-| `compressed_preview` | 압축 전개 | `rule` | `uncommon` | Next preview -2, 최소 1 |
-| `no_hold_focus` | 단기 집중 | `rule` | `rare` | Hold 비활성화 |
-| `holdless_focus` | 미사용 집중 | `nextHold` | `uncommon` | Hold 미사용 시 공격 피해 +30% |
+| `gentle_fall` | 느린 낙하 | `rule` | `common` | 블록 낙하 속도 20% 감소 |
+| `delayed_lock` | Lock Delay 증가 | `rule` | `common` | lock delay +150ms |
+| `compressed_preview` | Next 감소 공격 강화 | `rule` | `uncommon` | Next preview -2, 공격 피해 +20% |
+| `wide_next` | Next +1 | `nextHold` | `common` | Next preview +1 |
+| `deep_next` | Next +2 | `nextHold` | `rare` | Next preview +2 |
+| `no_hold_focus` | Hold 금지 공격 강화 | `rule` | `rare` | Hold 비활성화, 공격 피해 +50% |
+| `extra_hold_slot` | Hold 슬롯 +1 | `nextHold` | `rare` | Hold 슬롯 +1, 최대 2칸 |
+| `forced_speed` | 빠른 낙하 공격 강화 | `rule` | `uncommon` | gravity 간격 x0.75, 공격 피해 +25% |
+| `overheated_drop` | 빠른 고정 공격 강화 | `rule` | `rare` | lock delay -100ms, 공격 피해 +35% |
+| `quick_judgement` | Lock 감소 B2B 강화 | `rule` | `uncommon` | lock delay -75ms, B2B 공격 피해 +25% |
+| `holdless_focus` | Hold 미사용 공격 강화 | `nextHold` | `uncommon` | Hold 미사용 시 공격 피해 +30% |
 
 ### disabled legacy 유물
 
@@ -175,8 +181,12 @@ current * attackMultiplier + addAttack
 
 ## 조건식 문법
 
-공격 modifier의 `when`은 AND 조건만 지원한다.
-모든 조건이 true일 때 modifier가 적용된다.
+공격 modifier는 `when`과 `whenAny`로 조건을 표현한다.
+
+- `when`은 AND 조건이다. 모든 조건이 true일 때 통과한다.
+- `whenAny`는 OR 조건이다. 배열 안의 조건 묶음 중 하나 이상이 true일 때 통과한다.
+- `when`과 `whenAny`가 같이 있으면 `when AND whenAny`로 판정한다.
+- `when`과 `whenAny`가 모두 없으면 항상 적용된다.
 
 ### primitive exact match
 
@@ -237,14 +247,37 @@ current * attackMultiplier + addAttack
 }
 ```
 
-### 미지원
+### OR 조건
 
-OR 조건은 아직 지원하지 않는다.
-예를 들어 "Tetris 또는 T-spin" 조건은 현재 하나의 modifier로 표현할 수 없다.
+```ts
+{
+  trigger: "onAttackCalculated",
+  attackMultiplier: 1.25,
+  whenAny: [
+    { linesCleared: 4 },
+    { isTSpin: true }
+  ]
+}
+```
+
+### AND + OR 조건
+
+```ts
+{
+  trigger: "onAttackCalculated",
+  attackMultiplier: 1.25,
+  when: { isDanger: true },
+  whenAny: [
+    { linesCleared: 4 },
+    { isTSpin: true }
+  ]
+}
+```
+
+위 예시는 `isDanger`가 true이고, 동시에 Tetris 또는 T-spin 조건 중 하나를 만족해야 적용된다.
 
 ## 아직 구현하지 않은 것
 
-- OR 조건
 - 이벤트형 유물
 - 다음 공격 강화
 - B2B 끊김 방지

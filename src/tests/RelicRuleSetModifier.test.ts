@@ -32,10 +32,46 @@ describe("Relic rule set modifiers", () => {
     expect(clamped.nextPreviewCount).toBe(1);
   });
 
+  it("applies wide_next as +1 next preview count", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.wide_next]);
+
+    expect(result.nextPreviewCount).toBe(6);
+  });
+
+  it("applies deep_next as +2 next preview count", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.deep_next]);
+
+    expect(result.nextPreviewCount).toBe(7);
+  });
+
   it("applies no_hold_focus as a hold disable override", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.no_hold_focus]);
 
     expect(result.holdEnabled).toBe(false);
+  });
+
+  it("applies extra_hold_slot as +1 max hold slot", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.extra_hold_slot]);
+
+    expect(result.maxHoldSlots).toBe(2);
+  });
+
+  it("applies forced_speed as a 0.75x gravity interval multiplier", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.forced_speed]);
+
+    expect(result.gravityMs).toBe(675);
+  });
+
+  it("applies overheated_drop as -100ms lock delay", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.overheated_drop]);
+
+    expect(result.lockDelayMs).toBe(400);
+  });
+
+  it("applies quick_judgement as -75ms lock delay", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.quick_judgement]);
+
+    expect(result.lockDelayMs).toBe(425);
   });
 
   it("does not mutate the base rule set", () => {
