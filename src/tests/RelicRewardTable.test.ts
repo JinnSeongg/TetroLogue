@@ -29,6 +29,12 @@ describe("Relic reward tables", () => {
     expect(shopRelicIds()).not.toContain("relic_tetris_power");
   });
 
+  it("excludes temporarily disabled hold slot relic from every reward table", () => {
+    expect(relicDefinitions.extra_hold_slot.obtainSource).toBe("disabled");
+    expect(combatRelicIds()).not.toContain("extra_hold_slot");
+    expect(shopRelicIds()).not.toContain("extra_hold_slot");
+  });
+
   it("defines reward metadata for every relic", () => {
     for (const relic of Object.values(relicDefinitions)) {
       expect(relic.category).toBeDefined();

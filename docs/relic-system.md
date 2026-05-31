@@ -127,15 +127,14 @@ current * attackMultiplier + addAttack
 | id | name | category | rarity | 효과 요약 |
 | --- | --- | --- | --- | --- |
 | `gentle_fall` | 느린 낙하 | `rule` | `common` | 블록 낙하 속도 20% 감소 |
-| `delayed_lock` | Lock Delay 증가 | `rule` | `common` | lock delay +150ms |
+| `delayed_lock` | Lock Delay 증가 | `rule` | `common` | lock delay +200ms |
 | `compressed_preview` | Next 감소 공격 강화 | `rule` | `uncommon` | Next preview -2, 공격 피해 +20% |
 | `wide_next` | Next +1 | `nextHold` | `common` | Next preview +1 |
 | `deep_next` | Next +2 | `nextHold` | `rare` | Next preview +2 |
 | `no_hold_focus` | Hold 금지 공격 강화 | `rule` | `rare` | Hold 비활성화, 공격 피해 +50% |
-| `extra_hold_slot` | Hold 슬롯 +1 | `nextHold` | `rare` | Hold 슬롯 +1, 최대 2칸 |
 | `forced_speed` | 빠른 낙하 공격 강화 | `rule` | `uncommon` | gravity 간격 x0.75, 공격 피해 +25% |
-| `overheated_drop` | 빠른 고정 공격 강화 | `rule` | `rare` | lock delay -100ms, 공격 피해 +35% |
-| `quick_judgement` | Lock 감소 B2B 강화 | `rule` | `uncommon` | lock delay -75ms, B2B 공격 피해 +25% |
+| `overheated_drop` | 빠른 고정 공격 강화 | `rule` | `rare` | lock delay -300ms, 공격 피해 +35% |
+| `quick_judgement` | Lock 감소 B2B 강화 | `rule` | `uncommon` | lock delay -300ms, B2B 공격 피해 +25% |
 | `holdless_focus` | Hold 미사용 공격 강화 | `nextHold` | `uncommon` | Hold 미사용 시 공격 피해 +30% |
 
 ### disabled legacy 유물
@@ -283,6 +282,7 @@ current * attackMultiplier + addAttack
 - B2B 끊김 방지
 - 전투 시작 후 시간제 버프
 - 사망 직전 생존
+- `extra_hold_slot` / Hold 슬롯 +1 재활성화. 현재 Hold 도메인, 입력, UI가 다중 슬롯을 완전 지원하지 않아 `obtainSource: "disabled"`로 임시 비활성화되어 있다. 추후 Hold 구조를 다중 슬롯 기준으로 확장한 뒤 재활성화한다.
 - `deepHoleCount` 실제 계산
 - rarity 확률 가중치
 

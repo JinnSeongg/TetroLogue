@@ -18,10 +18,10 @@ describe("Relic rule set modifiers", () => {
     expect(result.gravityMs).toBe(1080);
   });
 
-  it("applies delayed_lock as +150ms lock delay", () => {
+  it("applies delayed_lock as +200ms lock delay", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.delayed_lock]);
 
-    expect(result.lockDelayMs).toBe(650);
+    expect(result.lockDelayMs).toBe(700);
   });
 
   it("applies compressed_preview and clamps next preview count to at least 1", () => {
@@ -62,16 +62,16 @@ describe("Relic rule set modifiers", () => {
     expect(result.gravityMs).toBe(675);
   });
 
-  it("applies overheated_drop as -100ms lock delay", () => {
+  it("applies overheated_drop as -300ms lock delay", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.overheated_drop]);
 
-    expect(result.lockDelayMs).toBe(400);
+    expect(result.lockDelayMs).toBe(200);
   });
 
-  it("applies quick_judgement as -75ms lock delay", () => {
+  it("applies quick_judgement as -300ms lock delay", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.quick_judgement]);
 
-    expect(result.lockDelayMs).toBe(425);
+    expect(result.lockDelayMs).toBe(200);
   });
 
   it("does not mutate the base rule set", () => {

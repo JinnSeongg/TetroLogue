@@ -600,6 +600,11 @@ h2 {
   color: #72dd8b;
 }
 
+.combat-status-badge-lock {
+  border-color: rgba(242, 217, 120, 0.5);
+  color: #f2d978;
+}
+
 .fast-chain-indicator {
   align-items: center;
   background: #171c22;

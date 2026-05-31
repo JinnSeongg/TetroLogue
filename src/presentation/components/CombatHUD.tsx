@@ -13,6 +13,13 @@ type DamageFeedback = {
   damage: number;
 };
 
+type StatusBadge = {
+  key: string;
+  label: string;
+  value: number | string;
+  className: string;
+};
+
 export function CombatHUD({ combat, attackAnimation, damageVisibleMs = 2100 }: Props) {
   const [damageFeedback, setDamageFeedback] = useState<DamageFeedback | null>(null);
   const feedbackEvent = combat?.lastFeedbackEvent;
@@ -24,8 +31,8 @@ export function CombatHUD({ combat, attackAnimation, damageVisibleMs = 2100 }: P
     return () => window.clearTimeout(timeout);
   }, [feedbackEvent, damageVisibleMs]);
 
-  const statusBadges = combat
-    ? [
+  const statusBadges: StatusBadge[] = combat
+    ? ([
         combat.player.backToBackActive
           ? { key: "b2b", label: "B2B", value: combat.player.backToBackCount, className: "b2b" }
           : undefined,
@@ -35,7 +42,10 @@ export function CombatHUD({ combat, attackAnimation, damageVisibleMs = 2100 }: P
         combat.player.isFastState
           ? { key: "speed", label: "SPEED", value: combat.player.fastChainCount, className: "speed" }
           : undefined,
-      ].filter((badge): badge is { key: string; label: string; value: number; className: string } => Boolean(badge))
+        combat.ruleSetModifierDebug && combat.ruleSet.lockDelayMs !== combat.ruleSetModifierDebug.baseRuleSet.lockDelayMs
+          ? { key: "lock", label: "LOCK", value: `${combat.ruleSet.lockDelayMs}ms`, className: "lock" }
+          : undefined,
+      ].filter(Boolean) as StatusBadge[])
     : [];
 
   return (

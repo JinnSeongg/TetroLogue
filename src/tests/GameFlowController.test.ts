@@ -149,6 +149,25 @@ describe("GameFlowController", () => {
     expect(state.scene).toBe("nodeMap");
     expect(state.run?.progress.currentFloor).toBe(5);
   });
+
+  it("stores effective lock delay rule modifiers on combat state", () => {
+    expect(startCombatWithRelic("delayed_lock").combat?.ruleSet.lockDelayMs).toBe(700);
+    expect(startCombatWithRelic("overheated_drop").combat?.ruleSet.lockDelayMs).toBe(200);
+    expect(startCombatWithRelic("quick_judgement").combat?.ruleSet.lockDelayMs).toBe(200);
+    expect(startCombatWithRelic(undefined).combat?.ruleSet.lockDelayMs).toBe(500);
+  });
+
+  it("uses combat ruleSet lockDelayMs while ticking combat", () => {
+    const controller = new GameFlowController(new SeededRandomProvider(25), new MemoryRepository());
+    const grounded = groundActivePiece(startCombatWithRelic("delayed_lock", controller));
+
+    const beforeEffectiveDelay = controller.tickCombat(grounded, 500, 0, 500);
+    expect(beforeEffectiveDelay.events.some((event) => event.type === "PiecePlaced")).toBe(false);
+    expect(beforeEffectiveDelay.combat?.player.lockElapsedMs).toBe(500);
+
+    const afterEffectiveDelay = controller.tickCombat(beforeEffectiveDelay, 200, 0, 700);
+    expect(afterEffectiveDelay.events.some((event) => event.type === "PiecePlaced")).toBe(true);
+  });
 });
 
 function defeatEnemyWithTetrises(controller: GameFlowController, state: GameAppState): GameAppState {
@@ -162,4 +181,23 @@ function withOwnedRewards(state: GameAppState, rewards: typeof relicRewardTable)
   if (!state.run) return state;
   const relicInventory = rewards.reduce((inventory, reward) => inventory.add(String(reward.relicId)), state.run.relicInventory);
   return { ...state, run: { ...state.run, relicInventory } };
+}
+
+function startCombatWithRelic(relicId?: string, controller = new GameFlowController(new SeededRandomProvider(26), new MemoryRepository())): GameAppState {
+  const state = relicId ? withOwnedRelic(controller.startRun(), relicId) : controller.startRun();
+  return controller.enterNode(state, state.run?.currentNodeId ?? "");
+}
+
+function withOwnedRelic(state: GameAppState, relicId: string): GameAppState {
+  if (!state.run) return state;
+  return { ...state, run: { ...state.run, relicInventory: state.run.relicInventory.add(relicId) } };
+}
+
+function groundActivePiece(state: GameAppState): GameAppState {
+  const combat = state.combat;
+  const activePiece = combat?.player.activePiece;
+  if (!combat || !activePiece) throw new Error("Expected active combat with active piece");
+  let grounded = activePiece;
+  while (combat.player.board.canPlace(grounded.move(0, 1))) grounded = grounded.move(0, 1);
+  return { ...state, combat: { ...combat, player: { ...combat.player, activePiece: grounded } } };
 }

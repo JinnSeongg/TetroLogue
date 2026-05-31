@@ -49,10 +49,10 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
   delayed_lock: {
     id: "delayed_lock",
     name: "Lock Delay 증가",
-    description: "lock delay가 150ms 증가합니다.",
+    description: "lock delay가 200ms 증가합니다.",
     ...shopRelic("rule", "common"),
     tags: ["rule", "shop", "lockDelay"],
-    modifiers: [{ trigger: "passive", lockDelayMsAdd: 150 }],
+    modifiers: [{ trigger: "passive", lockDelayMsAdd: 200 }],
   },
   compressed_preview: {
     id: "compressed_preview",
@@ -96,8 +96,8 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     id: "extra_hold_slot",
     name: "Hold 슬롯 +1",
     description: "Hold 슬롯이 1칸 증가합니다. 최대 2칸까지 보관할 수 있습니다.",
-    ...shopRelic("nextHold", "rare"),
-    tags: ["rule", "shop", "hold"],
+    ...relicMeta("nextHold", "rare", "disabled"),
+    tags: ["rule", "shop", "hold", "disabled", "todo"],
     modifiers: [{ trigger: "passive", maxHoldSlotsAdd: 1 }],
   },
   forced_speed: {
@@ -114,22 +114,22 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
   overheated_drop: {
     id: "overheated_drop",
     name: "빠른 고정 공격 강화",
-    description: "lock delay가 100ms 감소하지만, 공격 피해가 35% 증가합니다.",
+    description: "lock delay가 300ms 감소하지만, 공격 피해가 35% 증가합니다.",
     ...shopRelic("rule", "rare"),
     tags: ["rule", "shop", "lockDelay", "attack"],
     modifiers: [
-      { trigger: "passive", lockDelayMsAdd: -100 },
+      { trigger: "passive", lockDelayMsAdd: -300 },
       { trigger: "onAttackCalculated", attackMultiplier: 1.35 },
     ],
   },
   quick_judgement: {
     id: "quick_judgement",
     name: "Lock 감소 B2B 강화",
-    description: "lock delay가 75ms 감소하지만, B2B 공격 피해가 25% 증가합니다.",
+    description: "lock delay가 300ms 감소하지만, B2B 공격 피해가 25% 증가합니다.",
     ...shopRelic("rule", "uncommon"),
     tags: ["rule", "shop", "lockDelay", "b2b", "attack"],
     modifiers: [
-      { trigger: "passive", lockDelayMsAdd: -75 },
+      { trigger: "passive", lockDelayMsAdd: -300 },
       { trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { backToBackActive: true } },
     ],
   },
