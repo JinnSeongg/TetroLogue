@@ -80,6 +80,8 @@ export class StartCombatUseCase {
           lastLockResetAtMs: undefined,
           lockResetLimitReachedLogged: false,
           lastSpinAction: undefined,
+          nextAttackBuffs: [],
+          timedAttackBuffs: [],
         },
         enemy: {
           definition: enemy,

@@ -13,11 +13,18 @@ export type ModifierContext = {
   isTSpin?: boolean;
   isTSpinMini?: boolean;
   isTSpinFull?: boolean;
+  isPerfectClear?: boolean;
   combo?: number;
   comboBonus?: number;
   comboDamage?: number;
   attackKind?: string;
   b2bCount?: number;
+  isB2BMultipleOf3?: boolean;
+  isB2BMultipleOf10?: boolean;
+  hasNextPieceT?: boolean;
+  hasNextPieceI?: boolean;
+  usedPieceType?: string;
+  isBoss?: boolean;
 };
 
 type ModifierConditionValue = boolean | number | string;
@@ -68,11 +75,21 @@ export type PassiveModifier = {
   holdEnabledOverride?: boolean;
   speedBonusPerStackAdd?: number;
   speedBonusCapAdd?: number;
+  instantSoftDrop?: boolean;
 };
 
-export type Modifier = AttackModifier | PassiveModifier;
+export type NextAttackBuffModifier = {
+  trigger: "onAttackResolved";
+  flatBonusAdd?: number;
+  stateBonusAdd?: number;
+  durationMs?: number;
+  when?: ModifierConditionSet;
+  whenAny?: ModifierConditionSet[];
+};
 
-export const modifierApplies = (modifier: AttackModifier, context: ModifierContext): boolean => {
+export type Modifier = AttackModifier | PassiveModifier | NextAttackBuffModifier;
+
+export const modifierApplies = (modifier: AttackModifier | NextAttackBuffModifier, context: ModifierContext): boolean => {
   const whenMatches = modifier.when === undefined || conditionSetMatches(modifier.when, context);
   const whenAnyMatches =
     modifier.whenAny === undefined || modifier.whenAny.some((conditionSet) => conditionSetMatches(conditionSet, context));
@@ -89,7 +106,7 @@ function conditionSetMatches(conditionSet: ModifierConditionSet, context: Modifi
 }
 
 function conditionMatches(value: unknown, condition: unknown): boolean {
-  if (typeof condition === "boolean" || typeof condition === "number") {
+  if (typeof condition === "boolean" || typeof condition === "number" || typeof condition === "string") {
     return value === condition;
   }
 

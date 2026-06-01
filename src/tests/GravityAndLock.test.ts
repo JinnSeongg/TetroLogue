@@ -5,6 +5,7 @@ import { StartRunUseCase } from "../application/StartRunUseCase";
 import { TickCombatUseCase } from "../application/TickCombatUseCase";
 import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
 import { standardRuleSet } from "../domain/tetris/TetrisRuleSet";
+import { GhostPieceCalculator } from "../domain/tetris/GhostPieceCalculator";
 
 const fastRuleSet = { ...standardRuleSet, gravityMs: 100, softDropGravityMs: 20, lockDelayMs: 80 };
 
@@ -53,6 +54,49 @@ describe("gravity and lock delay", () => {
 
     expect(next.combat?.player.activePiece?.position.y).toBe((state.combat?.player.activePiece?.position.y ?? 0) + 3);
     expect(next.events.filter((event) => event.type === "PlayerActionSucceeded" && event.action === "softDrop")).toHaveLength(3);
+  });
+
+  it("instant soft drop moves the active piece to the ghost position without locking", () => {
+    const random = new SeededRandomProvider(36);
+    const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
+    const combat = state.combat;
+    if (!combat?.player.activePiece) throw new Error("Expected active piece");
+    const ghost = new GhostPieceCalculator().calculate(combat.player.board, combat.player.activePiece);
+    if (!ghost) throw new Error("Expected ghost piece");
+
+    const next = new TickCombatUseCase(random, { ...fastRuleSet, instantSoftDrop: true }).execute(state, 16, 1);
+
+    expect(next.combat?.player.activePiece?.position.y).toBe(ghost.position.y);
+    expect(next.events.some((event) => event.type === "PiecePlaced")).toBe(false);
+    expect(next.events.at(-1)).toEqual({ type: "PlayerActionSucceeded", action: "softDrop" });
+  });
+
+  it("instant soft drop keeps lock delay flow after reaching the ground", () => {
+    const random = new SeededRandomProvider(37);
+    const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
+
+    const dropped = new TickCombatUseCase(random, { ...fastRuleSet, instantSoftDrop: true }).execute(state, 16, 1, 1000);
+    const beforeLockDelay = new TickCombatUseCase(random, { ...fastRuleSet, instantSoftDrop: true }).execute(dropped, 40, 0, 1040);
+
+    expect(dropped.combat?.player.isGrounded).toBe(true);
+    expect(dropped.combat?.player.lockElapsedMs).toBe(0);
+    expect(beforeLockDelay.events.some((event) => event.type === "PiecePlaced")).toBe(false);
+    expect(beforeLockDelay.combat?.player.lockElapsedMs).toBe(40);
+  });
+
+  it("instant soft drop is safe when the active piece is already grounded", () => {
+    const random = new SeededRandomProvider(38);
+    const state = new StartCombatUseCase(random).execute(new StartRunUseCase().execute());
+    const combat = state.combat;
+    if (!combat?.player.activePiece) throw new Error("Expected active piece");
+    const ghost = new GhostPieceCalculator().calculate(combat.player.board, combat.player.activePiece);
+    if (!ghost) throw new Error("Expected ghost piece");
+    const groundedState = { ...state, combat: { ...combat, player: { ...combat.player, activePiece: ghost } } };
+
+    const next = new TickCombatUseCase(random, { ...fastRuleSet, instantSoftDrop: true }).execute(groundedState, 0, 1);
+
+    expect(next.combat?.player.activePiece?.position.y).toBe(ghost.position.y);
+    expect(next.events.some((event) => event.type === "PiecePlaced")).toBe(false);
   });
 
   it("does not spend normal gravity buildup as extra soft drop movement", () => {

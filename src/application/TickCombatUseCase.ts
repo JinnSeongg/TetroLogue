@@ -1,6 +1,7 @@
 import type { GameAppState } from "./GameAppState";
 import type { RandomProvider } from "../domain/shared/RandomProvider";
 import { MovementSystem } from "../domain/tetris/MovementSystem";
+import { GhostPieceCalculator } from "../domain/tetris/GhostPieceCalculator";
 import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
 import { LockActivePieceUseCase } from "./LockActivePieceUseCase";
 import type { InitialActionState } from "./input/InitialActionState";
@@ -25,7 +26,10 @@ export class TickCombatUseCase {
     const combatWithElapsed = addBattleDuration(combat, deltaMs);
     const player = combatWithElapsed.player;
     const movement = new MovementSystem();
-    const softDrop = applySoftDropSteps(player.board, piece, movement, softDropSteps);
+    const softDrop =
+      this.ruleSet.instantSoftDrop && softDropSteps > 0
+        ? applyInstantSoftDrop(player.board, piece)
+        : applySoftDropSteps(player.board, piece, movement, softDropSteps);
     const activePiece = softDrop.piece;
     const actionSoundEvents = Array.from({ length: softDrop.stepsMoved }, () => ({ type: "PlayerActionSucceeded" as const, action: "softDrop" as const }));
     const canFall = player.board.canPlace(activePiece.move(0, 1));
@@ -103,6 +107,15 @@ export class TickCombatUseCase {
   }
 }
 
+function applyInstantSoftDrop(
+  board: CombatState["player"]["board"],
+  piece: NonNullable<CombatState["player"]["activePiece"]>,
+): { piece: NonNullable<CombatState["player"]["activePiece"]>; stepsMoved: number } {
+  const ghost = new GhostPieceCalculator().calculate(board, piece);
+  if (!ghost || ghost.position.y === piece.position.y) return { piece, stepsMoved: 0 };
+  return { piece: ghost, stepsMoved: 1 };
+}
+
 function applySoftDropSteps(
   board: CombatState["player"]["board"],
   piece: NonNullable<CombatState["player"]["activePiece"]>,
@@ -126,9 +139,20 @@ function addBattleDuration(combat: CombatState, deltaMs: number): CombatState {
   const safeDelta = Number.isFinite(deltaMs) && deltaMs > 0 ? deltaMs : 0;
   return {
     ...combat,
+    player: {
+      ...combat.player,
+      timedAttackBuffs: tickTimedAttackBuffs(combat.player.timedAttackBuffs ?? [], safeDelta),
+    },
     telemetry: {
       ...(combat.telemetry ?? createInitialCombatTelemetry()),
       battleDurationMs: (combat.telemetry?.battleDurationMs ?? 0) + safeDelta,
     },
   };
+}
+
+function tickTimedAttackBuffs(buffs: CombatState["player"]["timedAttackBuffs"], deltaMs: number): CombatState["player"]["timedAttackBuffs"] {
+  if (deltaMs <= 0) return buffs;
+  return buffs
+    .map((buff) => ({ ...buff, remainingMs: buff.remainingMs - deltaMs }))
+    .filter((buff) => buff.remainingMs > 0);
 }

@@ -190,6 +190,7 @@ export class EffectResolver {
           maxHoldSlots: resolveNextMaxHoldSlots(current.maxHoldSlots, modifier.maxHoldSlots, modifier.maxHoldSlotsAdd),
           speedBonusPerStack: current.speedBonusPerStack + sanitizeRuleSetAdd(modifier.speedBonusPerStackAdd),
           speedBonusCap: current.speedBonusCap + sanitizeRuleSetAdd(modifier.speedBonusCapAdd),
+          instantSoftDrop: modifier.instantSoftDrop === true ? true : current.instantSoftDrop,
         });
         if (ruleSetChanged(current, next)) {
           appliedRuleRelicIds.push(String(relic.id));
@@ -244,6 +245,7 @@ function sanitizeRuleSet(ruleSet: TetrisRuleSet): TetrisRuleSet {
     maxHoldSlots: normalizeMaxHoldSlots(ruleSet.maxHoldSlots),
     speedBonusPerStack: clampNumber(ruleSet.speedBonusPerStack, DEFAULT_SPEED_BONUS_PER_STACK, 0),
     speedBonusCap: clampInteger(ruleSet.speedBonusCap, 0),
+    instantSoftDrop: ruleSet.instantSoftDrop === true,
   };
 }
 
@@ -280,6 +282,7 @@ function ruleSetChanged(before: TetrisRuleSet, after: TetrisRuleSet): boolean {
     before.holdEnabled !== after.holdEnabled ||
     before.maxHoldSlots !== after.maxHoldSlots ||
     before.speedBonusPerStack !== after.speedBonusPerStack ||
-    before.speedBonusCap !== after.speedBonusCap
+    before.speedBonusCap !== after.speedBonusCap ||
+    before.instantSoftDrop !== after.instantSoftDrop
   );
 }

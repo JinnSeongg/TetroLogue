@@ -17,10 +17,13 @@ import { FieldAnalyzer } from "../domain/combat/field-analysis/FieldAnalyzer";
 import { CombatFeedbackEventFactory } from "../domain/combat/CombatFeedbackEventFactory";
 import type { BattleResultSummary, CombatTelemetry } from "../domain/combat/BattleResultSummary";
 import { createInitialCombatTelemetry } from "../domain/combat/BattleResultSummary";
-import type { CombatState } from "../domain/combat/CombatState";
+import type { CombatState, NextAttackBuff, TimedAttackBuff } from "../domain/combat/CombatState";
 import { triggerCombatGameOver } from "./CombatGameOver";
 import { EffectResolver } from "../domain/relic/EffectResolver";
 import { CompleteCurrentNodeUseCase } from "./CompleteCurrentNodeUseCase";
+import type { TetrominoType } from "../domain/tetris/Cell";
+import { modifierApplies, type ModifierContext } from "../domain/relic/Modifier";
+import type { RelicDefinition } from "../domain/relic/RelicDefinition";
 
 export class ResolveLineClearUseCase {
   constructor(
@@ -35,6 +38,7 @@ export class ResolveLineClearUseCase {
     isPerfectClear = false,
     clearResult: ClearResult = createClearResult({ linesCleared, spinResult, isPerfectClear }),
     nowMs = 0,
+    usedPieceType?: TetrominoType,
   ): GameAppState {
     if (!state.combat || !state.run || state.combat.result !== "ongoing") return state;
     if (!state.combat.player.activePiece) {
@@ -59,36 +63,76 @@ export class ResolveLineClearUseCase {
           ? [{ id: "garbage_1", amount: state.combat.enemy.pendingGarbage, source: "legacy_pending", createdAtMs: 0, readyAtMs: 0 }]
           : []),
     );
+    const attackContext: Omit<ModifierContext, "attack"> = {
+      linesCleared,
+      backToBackActive: state.combat.player.backToBackActive,
+      b2bCount: state.combat.player.backToBackCount,
+      isDanger: attackFieldState.dangerLevel === "Danger" || attackFieldState.dangerLevel === "Critical",
+      fieldHeight: attackFieldState.maxHeight,
+      holdUsedThisBattle: state.combat.player.holdUsedThisBattle,
+      pendingGarbageLines: garbageQueue.getTotalAmount(),
+      isFast: state.combat.player.isFastState,
+      fastChain: state.combat.player.fastChainCount,
+      holeCount: attackFieldState.holeCount,
+      isTSpin: clearResult.isTSpin,
+      isTSpinMini: clearResult.isTSpinMini,
+      isTSpinFull: clearResult.isTSpin && !clearResult.isTSpinMini,
+      isPerfectClear: clearResult.isPerfectClear,
+      combo: baseAttack.comboAfter,
+      comboBonus: baseAttack.comboBonus,
+      comboDamage: baseAttack.comboDamage,
+      attackKind: baseAttack.attackType,
+      isB2BMultipleOf3: isPositiveMultiple(state.combat.player.backToBackCount, 3),
+      isB2BMultipleOf10: isPositiveMultiple(state.combat.player.backToBackCount, 10),
+      hasNextPieceT: state.combat.player.nextPieces.includes("T"),
+      hasNextPieceI: state.combat.player.nextPieces.includes("I"),
+      usedPieceType,
+      isBoss: isBossRole(state.combat.enemy.definition.role),
+    };
+    const ownedRelics = state.run.relicInventory.getDefinitions();
     const relicAttack = new EffectResolver().applyAttackModifiers(
       baseAttack,
-      state.run.relicInventory.getDefinitions(),
-      {
-        linesCleared,
-        backToBackActive: state.combat.player.backToBackActive,
-        b2bCount: state.combat.player.backToBackCount,
-        isDanger: attackFieldState.dangerLevel === "Danger" || attackFieldState.dangerLevel === "Critical",
-        fieldHeight: attackFieldState.maxHeight,
-        holdUsedThisBattle: state.combat.player.holdUsedThisBattle,
-        pendingGarbageLines: garbageQueue.getTotalAmount(),
-        isFast: state.combat.player.isFastState,
-        fastChain: state.combat.player.fastChainCount,
-        holeCount: attackFieldState.holeCount,
-        isTSpin: clearResult.isTSpin,
-        isTSpinMini: clearResult.isTSpinMini,
-        isTSpinFull: clearResult.isTSpin && !clearResult.isTSpinMini,
-        combo: baseAttack.comboAfter,
-        comboBonus: baseAttack.comboBonus,
-        comboDamage: baseAttack.comboDamage,
-        attackKind: baseAttack.attackType,
-      },
+      ownedRelics,
+      attackContext,
       { includeDetails: true },
     );
+    const hasAttack = hasAttackEvent(linesCleared, clearResult);
+    const pendingTimedAttackBuffs = state.combat.player.timedAttackBuffs ?? [];
+    const timedAttack =
+      pendingTimedAttackBuffs.length > 0
+        ? new EffectResolver().applyAttackModifiers(
+            relicAttack.attackResult ?? baseAttack,
+            pendingTimedAttackBuffs.map(timedAttackBuffToRelic),
+            attackContext,
+            { includeDetails: true },
+          )
+        : undefined;
+    const pendingNextAttackBuffs = state.combat.player.nextAttackBuffs ?? [];
+    const buffAttack =
+      hasAttack && pendingNextAttackBuffs.length > 0
+        ? new EffectResolver().applyAttackModifiers(
+            timedAttack?.attackResult ?? relicAttack.attackResult ?? baseAttack,
+            pendingNextAttackBuffs.map(nextAttackBuffToRelic),
+            attackContext,
+            { includeDetails: true },
+          )
+        : undefined;
+    const finalAttackResult = buffAttack?.attackResult ?? timedAttack?.attackResult ?? relicAttack.attackResult ?? baseAttack;
+    const appliedRelicIds = uniqueStrings([
+      ...(relicAttack.appliedRelicIds ?? []),
+      ...(timedAttack?.appliedRelicIds ?? []),
+      ...(buffAttack?.appliedRelicIds ?? []),
+    ]);
     const attack = {
-      ...(relicAttack.attackResult ?? baseAttack),
+      ...finalAttackResult,
       preRelicTotalDamage: relicAttack.preRelicAttack,
-      relicAttackBonus: relicAttack.relicAttackBonus,
-      appliedRelicIds: relicAttack.appliedRelicIds,
+      relicAttackBonus: finalAttackResult.totalDamage - relicAttack.preRelicAttack,
+      appliedRelicIds,
     };
+    const generatedNextAttackBuffs = createNextAttackBuffs(ownedRelics, attackContext);
+    const generatedTimedAttackBuffs = createTimedAttackBuffs(ownedRelics, attackContext);
+    const nextAttackBuffs = upsertNextAttackBuffs(hasAttack ? [] : pendingNextAttackBuffs, generatedNextAttackBuffs);
+    const timedAttackBuffs = upsertTimedAttackBuffs(pendingTimedAttackBuffs, generatedTimedAttackBuffs);
     const cancelResult = garbageQueue.cancelWithAttack(attack.totalDamage);
     // Damage order: player attack cancels pending garbage first, then remaining attack is reduced by enemy defense.
     const damage = new DamageResolver().resolve(state.combat.enemy.definition, cancelResult.remainingAttackDamage, linesCleared);
@@ -230,6 +274,8 @@ export class ResolveLineClearUseCase {
           backToBackActive: comboB2BResult.isBackToBack,
           backToBackCount: comboB2BResult.backToBackCount,
           actionCount: nextActionCount,
+          nextAttackBuffs,
+          timedAttackBuffs,
         },
         log: [...state.combat.log, ...combatEvents],
       },
@@ -302,4 +348,103 @@ function createBattleResultSummary(input: {
 function round(value: number, digits: number): number {
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
+}
+
+function isPositiveMultiple(value: number, divisor: number): boolean {
+  return value > 0 && value % divisor === 0;
+}
+
+function isBossRole(role: string): boolean {
+  return role === "boss" || role === "finalBoss";
+}
+
+function hasAttackEvent(linesCleared: number, clearResult: ClearResult): boolean {
+  return linesCleared > 0 || clearResult.isTSpin || clearResult.isPerfectClear;
+}
+
+function nextAttackBuffToRelic(buff: NextAttackBuff): RelicDefinition {
+  return {
+    id: buff.sourceRelicId,
+    name: buff.sourceRelicId,
+    description: "Runtime next attack buff.",
+    category: "legacy",
+    rarity: "common",
+    maxStacks: 1,
+    obtainSource: "disabled",
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: buff.flatBonusAdd }],
+  };
+}
+
+function timedAttackBuffToRelic(buff: TimedAttackBuff): RelicDefinition {
+  return {
+    id: buff.sourceRelicId,
+    name: buff.sourceRelicId,
+    description: "Runtime timed attack buff.",
+    category: "legacy",
+    rarity: "common",
+    maxStacks: 1,
+    obtainSource: "disabled",
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: buff.stateBonusAdd }],
+  };
+}
+
+function createNextAttackBuffs(relics: RelicDefinition[], context: Omit<ModifierContext, "attack">): NextAttackBuff[] {
+  const buffs: NextAttackBuff[] = [];
+  for (const relic of relics) {
+    for (const modifier of relic.modifiers) {
+      if (modifier.trigger !== "onAttackResolved") continue;
+      if (modifier.durationMs !== undefined) continue;
+      if (!modifierApplies(modifier, { ...context, attack: 0 })) continue;
+      buffs.push({
+        sourceRelicId: String(relic.id),
+        flatBonusAdd: sanitizeOptionalNumber(modifier.flatBonusAdd),
+      });
+    }
+  }
+  return buffs;
+}
+
+function createTimedAttackBuffs(relics: RelicDefinition[], context: Omit<ModifierContext, "attack">): TimedAttackBuff[] {
+  const buffs: TimedAttackBuff[] = [];
+  for (const relic of relics) {
+    for (const modifier of relic.modifiers) {
+      if (modifier.trigger !== "onAttackResolved") continue;
+      const durationMs = sanitizeDurationMs(modifier.durationMs);
+      if (durationMs === undefined) continue;
+      if (!modifierApplies(modifier, { ...context, attack: 0 })) continue;
+      buffs.push({
+        sourceRelicId: String(relic.id),
+        remainingMs: durationMs,
+        stateBonusAdd: sanitizeOptionalNumber(modifier.stateBonusAdd),
+      });
+    }
+  }
+  return buffs;
+}
+
+function upsertNextAttackBuffs(current: NextAttackBuff[], incoming: NextAttackBuff[]): NextAttackBuff[] {
+  const bySource = new Map<string, NextAttackBuff>();
+  for (const buff of current) bySource.set(buff.sourceRelicId, buff);
+  for (const buff of incoming) bySource.set(buff.sourceRelicId, buff);
+  return [...bySource.values()];
+}
+
+function upsertTimedAttackBuffs(current: TimedAttackBuff[], incoming: TimedAttackBuff[]): TimedAttackBuff[] {
+  const bySource = new Map<string, TimedAttackBuff>();
+  for (const buff of current) bySource.set(buff.sourceRelicId, buff);
+  for (const buff of incoming) bySource.set(buff.sourceRelicId, buff);
+  return [...bySource.values()];
+}
+
+function sanitizeOptionalNumber(value: number | undefined): number | undefined {
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function sanitizeDurationMs(value: number | undefined): number | undefined {
+  if (!Number.isFinite(value) || value === undefined) return undefined;
+  return Math.max(0, Math.round(value));
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }

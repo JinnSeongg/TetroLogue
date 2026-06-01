@@ -17,6 +17,7 @@ export type TetrisRuleSet = {
   speedBonusPerStack: number;
   speedBonusCap: number;
   ghostPieceEnabled: boolean;
+  instantSoftDrop: boolean;
   keepBackToBackOnEmptyTSpin: boolean;
 };
 
@@ -36,5 +37,6 @@ export const standardRuleSet: TetrisRuleSet = {
   speedBonusPerStack: DEFAULT_SPEED_BONUS_PER_STACK,
   speedBonusCap: DEFAULT_SPEED_BONUS_CAP,
   ghostPieceEnabled: true,
+  instantSoftDrop: false,
   keepBackToBackOnEmptyTSpin: true,
 };

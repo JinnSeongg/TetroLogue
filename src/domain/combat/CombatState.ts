@@ -16,6 +16,17 @@ import type { EnemyCalculatedStats } from "../balance/balanceTypes";
 import type { TetrisRuleSet } from "../tetris/TetrisRuleSet";
 import type { BattleResultSummary, CombatTelemetry } from "./BattleResultSummary";
 
+export type NextAttackBuff = {
+  sourceRelicId: string;
+  flatBonusAdd?: number;
+};
+
+export type TimedAttackBuff = {
+  sourceRelicId: string;
+  remainingMs: number;
+  stateBonusAdd?: number;
+};
+
 export type PlayerCombatState = {
   hp: number;
   board: Board;
@@ -46,6 +57,8 @@ export type PlayerCombatState = {
   lastLockResetAtMs?: number;
   lockResetLimitReachedLogged: boolean;
   lastSpinAction?: LastSpinAction;
+  nextAttackBuffs: NextAttackBuff[];
+  timedAttackBuffs: TimedAttackBuff[];
 };
 
 export type EnemyCombatState = {

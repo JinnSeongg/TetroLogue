@@ -24,6 +24,7 @@ import type { DifficultyId, EnemyCalculatedStats } from "../domain/balance/balan
 import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
 import { createScaledRuleSet } from "../domain/balance/ruleSetScaler";
 import { createInitialCombatTelemetry, type BattleResultSummary, type CombatTelemetry } from "../domain/combat/BattleResultSummary";
+import type { NextAttackBuff, TimedAttackBuff } from "../domain/combat/CombatState";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -70,6 +71,8 @@ type SavedGameStateV1 = {
       lockResetCount?: number;
       lastLockResetAtMs?: number;
       lockResetLimitReachedLogged?: boolean;
+      nextAttackBuffs?: NextAttackBuff[];
+      timedAttackBuffs?: TimedAttackBuff[];
     };
     enemy: {
       definitionId: string;
@@ -160,6 +163,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               lockResetCount: state.combat.player.lockResetCount,
               lastLockResetAtMs: state.combat.player.lastLockResetAtMs,
               lockResetLimitReachedLogged: state.combat.player.lockResetLimitReachedLogged,
+              nextAttackBuffs: state.combat.player.nextAttackBuffs,
+              timedAttackBuffs: state.combat.player.timedAttackBuffs,
             },
             enemy: {
               definitionId: state.combat.enemy.definition.id,
@@ -260,6 +265,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               lockResetCount: parsed.combat.player.lockResetCount ?? 0,
               lastLockResetAtMs: parsed.combat.player.lastLockResetAtMs,
               lockResetLimitReachedLogged: parsed.combat.player.lockResetLimitReachedLogged ?? false,
+              nextAttackBuffs: normalizeNextAttackBuffs(parsed.combat.player.nextAttackBuffs),
+              timedAttackBuffs: normalizeTimedAttackBuffs(parsed.combat.player.timedAttackBuffs),
             },
             enemy: {
               definition: combatEnemyDefinition,
@@ -337,5 +344,27 @@ function normalizeRuleSet(ruleSet: TetrisRuleSet | undefined, stats: EnemyCalcul
     maxHoldSlots: ruleSet?.maxHoldSlots ?? fallback.maxHoldSlots,
     speedBonusPerStack: ruleSet?.speedBonusPerStack ?? fallback.speedBonusPerStack,
     speedBonusCap: ruleSet?.speedBonusCap ?? fallback.speedBonusCap,
+    instantSoftDrop: ruleSet?.instantSoftDrop ?? fallback.instantSoftDrop,
   };
+}
+
+function normalizeNextAttackBuffs(value: NextAttackBuff[] | undefined): NextAttackBuff[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((buff) => buff && typeof buff.sourceRelicId === "string")
+    .map((buff) => ({
+      sourceRelicId: buff.sourceRelicId,
+      flatBonusAdd: Number.isFinite(buff.flatBonusAdd) ? buff.flatBonusAdd : undefined,
+    }));
+}
+
+function normalizeTimedAttackBuffs(value: TimedAttackBuff[] | undefined): TimedAttackBuff[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((buff) => buff && typeof buff.sourceRelicId === "string" && Number.isFinite(buff.remainingMs) && buff.remainingMs > 0)
+    .map((buff) => ({
+      sourceRelicId: buff.sourceRelicId,
+      remainingMs: Math.max(0, Math.round(buff.remainingMs)),
+      stateBonusAdd: Number.isFinite(buff.stateBonusAdd) ? buff.stateBonusAdd : undefined,
+    }));
 }

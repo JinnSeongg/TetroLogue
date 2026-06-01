@@ -12,23 +12,79 @@ describe("Relic reward tables", () => {
     expect(combatRelicIds()).toContain("tetris_power");
     expect(combatRelicIds()).toContain("tsd_tst_power");
     expect(combatRelicIds()).toContain("fast_tspin_power");
+    expect(combatRelicIds()).toContain("fast_efficiency_3");
+    expect(combatRelicIds()).toContain("low_combo_bonus");
+    expect(combatRelicIds()).toContain("boss_tetris_power");
+    expect(combatRelicIds()).toContain("boss_tspin_power");
+    expect(combatRelicIds()).toContain("boss_b2b_power");
+    expect(combatRelicIds()).toContain("boss_combo_power");
+    expect(combatRelicIds()).toContain("tetris_followup_power");
+    expect(combatRelicIds()).toContain("tspin_followup_power");
+    expect(combatRelicIds()).toContain("pc_followup_bonus");
+    expect(combatRelicIds()).toContain("pc_timed_base_power");
   });
 
   it("excludes shopOnly relics from the combat reward table", () => {
     expect(combatRelicIds()).not.toContain("gentle_fall");
-    expect(combatRelicIds()).not.toContain("holdless_focus");
+    expect(combatRelicIds()).not.toContain("no_hold_focus");
+    expect(combatRelicIds()).not.toContain("instant_soft_drop");
   });
 
   it("includes shopOnly relics in the shop reward table", () => {
     expect(shopRelicIds()).toContain("gentle_fall");
-    expect(shopRelicIds()).toContain("holdless_focus");
+    expect(shopRelicIds()).toContain("no_hold_focus");
     expect(shopRelicIds()).toContain("wide_next");
     expect(shopRelicIds()).toContain("forced_speed");
+    expect(shopRelicIds()).toContain("instant_soft_drop");
   });
 
   it("excludes disabled legacy relics from every reward table", () => {
     expect(combatRelicIds()).not.toContain("relic_tetris_power");
     expect(shopRelicIds()).not.toContain("relic_tetris_power");
+  });
+
+  it("excludes every disabled relic from combat and shop reward tables", () => {
+    const disabledRelicIds = Object.values(relicDefinitions)
+      .filter((relic) => relic.obtainSource === "disabled")
+      .map((relic) => String(relic.id));
+
+    for (const id of disabledRelicIds) {
+      expect(combatRelicIds()).not.toContain(id);
+      expect(shopRelicIds()).not.toContain(id);
+    }
+  });
+
+  it("excludes every Danger and Garbage relic from reward tables", () => {
+    const excludedCategoryIds = Object.values(relicDefinitions)
+      .filter((relic) => relic.category === "danger" || relic.category === "garbage")
+      .map((relic) => String(relic.id));
+
+    expect(excludedCategoryIds).toEqual(expect.arrayContaining(["danger_power", "garbage_absorb"]));
+    for (const id of excludedCategoryIds) {
+      expect(relicDefinitions[id].obtainSource).toBe("disabled");
+      expect(combatRelicIds()).not.toContain(id);
+      expect(shopRelicIds()).not.toContain(id);
+    }
+  });
+
+  it("excludes disabled planned relics from every reward table", () => {
+    const disabledIds = [
+      "danger_power",
+      "high_stack_counter",
+      "danger_line_bonus",
+      "danger_combo_power",
+      "garbage_absorb",
+      "garbage_surge",
+      "quick_judgement",
+      "holdless_focus",
+      "extra_hold_slot",
+    ];
+
+    for (const id of disabledIds) {
+      expect(relicDefinitions[id].obtainSource).toBe("disabled");
+      expect(combatRelicIds()).not.toContain(id);
+      expect(shopRelicIds()).not.toContain(id);
+    }
   });
 
   it("excludes temporarily disabled hold slot relic from every reward table", () => {

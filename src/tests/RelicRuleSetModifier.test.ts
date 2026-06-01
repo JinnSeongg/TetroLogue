@@ -24,6 +24,12 @@ describe("Relic rule set modifiers", () => {
     expect(result.lockDelayMs).toBe(700);
   });
 
+  it("applies instant_soft_drop as an instant soft drop rule flag", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.instant_soft_drop]);
+
+    expect(result.instantSoftDrop).toBe(true);
+  });
+
   it("applies compressed_preview and clamps next preview count to at least 1", () => {
     const normal = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.compressed_preview]);
     const clamped = new EffectResolver().resolveEffectiveRuleSet({ ...createBaseRuleSet(), nextPreviewCount: 2 }, [relicDefinitions.compressed_preview]);
@@ -74,18 +80,33 @@ describe("Relic rule set modifiers", () => {
     expect(result.lockDelayMs).toBe(200);
   });
 
-  it("applies fast_power as +0.01 speed bonus per stack", () => {
+  it("applies fast_power as +0.005 speed bonus per stack", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.fast_power]);
 
-    expect(result.speedBonusPerStack).toBe(0.02);
+    expect(result.speedBonusPerStack).toBe(0.015);
     expect(result.speedBonusCap).toBe(20);
   });
 
-  it("applies fast_chain_power as +10 speed bonus cap", () => {
-    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.fast_chain_power]);
+  it("applies Fast efficiency relics as +0.005 speed bonus per stack each", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [
+      relicDefinitions.fast_power,
+      relicDefinitions.fast_tspin_power,
+      relicDefinitions.fast_efficiency_3,
+    ]);
+
+    expect(result.speedBonusPerStack).toBe(0.025);
+    expect(result.speedBonusCap).toBe(20);
+  });
+
+  it("applies Fast cap relics as +10 speed bonus cap each", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [
+      relicDefinitions.fast_chain_power,
+      relicDefinitions.fast_combo_bonus,
+      relicDefinitions.fast_line_bonus,
+    ]);
 
     expect(result.speedBonusPerStack).toBe(0.01);
-    expect(result.speedBonusCap).toBe(30);
+    expect(result.speedBonusCap).toBe(50);
   });
 
   it("does not mutate the base rule set", () => {
