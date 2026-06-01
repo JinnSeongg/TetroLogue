@@ -32,6 +32,28 @@ export type AttackCalculationInput = {
   isPerfectClear: boolean;
   comboBefore: number;
   wasB2BActive: boolean;
+  b2bCount?: number;
+  fastChain?: number;
+};
+
+export type AttackBreakdown = {
+  baseAttack: number;
+  typeBonus: number;
+  stateBonus: number;
+  speedBonus: number;
+  baseScaledDamage: number;
+  comboDamage: number;
+  comboDamageMultiplier: number;
+  comboScaledDamage: number;
+  b2bDamage: number;
+  b2bDamageMultiplier: number;
+  b2bScaledDamage: number;
+  perfectClearDamage: number;
+  perfectClearDamageMultiplier: number;
+  perfectClearScaledDamage: number;
+  flatBonus: number;
+  counterBonus: number;
+  finalDamage: number;
 };
 
 export type AttackResult = {
@@ -49,10 +71,29 @@ export type AttackResult = {
   preRelicTotalDamage?: number;
   appliedRelicIds?: string[];
   totalDamage: number;
+  breakdown: AttackBreakdown;
+  baseAttack: number;
+  typeBonus: number;
+  stateBonus: number;
+  speedBonus: number;
+  baseScaledDamage: number;
+  comboDamage: number;
+  comboDamageMultiplier: number;
+  comboScaledDamage: number;
+  b2bDamage: number;
+  b2bDamageMultiplier: number;
+  b2bScaledDamage: number;
+  perfectClearDamage: number;
+  perfectClearDamageMultiplier: number;
+  perfectClearScaledDamage: number;
+  flatBonus: number;
+  counterBonus: number;
+  finalDamage: number;
   comboBefore: number;
   comboAfter: number;
   wasB2BActive: boolean;
   isB2BEligible: boolean;
+  b2bCount: number;
   b2bAfter: boolean;
   tags: AttackTag[];
 };

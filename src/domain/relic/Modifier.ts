@@ -15,7 +15,9 @@ export type ModifierContext = {
   isTSpinFull?: boolean;
   combo?: number;
   comboBonus?: number;
+  comboDamage?: number;
   attackKind?: string;
+  b2bCount?: number;
 };
 
 type ModifierConditionValue = boolean | number | string;
@@ -41,6 +43,17 @@ export type AttackModifier = {
   trigger: "onAttackCalculated";
   addAttack?: number;
   attackMultiplier?: number;
+  typeBonusAdd?: number;
+  stateBonusAdd?: number;
+  speedBonusAdd?: number;
+  comboDamageAdd?: number;
+  comboDamageMultiplierAdd?: number;
+  b2bDamageAdd?: number;
+  b2bDamageMultiplierAdd?: number;
+  perfectClearDamageAdd?: number;
+  perfectClearDamageMultiplierAdd?: number;
+  flatBonusAdd?: number;
+  counterBonusAdd?: number;
   when?: ModifierConditionSet;
   whenAny?: ModifierConditionSet[];
 };

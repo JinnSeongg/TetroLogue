@@ -2,6 +2,8 @@ import { modifierApplies, type ModifierContext } from "./Modifier";
 import type { RelicDefinition } from "./RelicDefinition";
 import { normalizeMaxHoldSlots } from "../tetris/HoldSlot";
 import type { TetrisRuleSet } from "../tetris/TetrisRuleSet";
+import type { AttackBreakdown, AttackResult } from "../combat/AttackTypes";
+import { calculateAttackBreakdown } from "../combat/attack/AttackResultFactory";
 
 export type AppliedAttackModifier = {
   relicId: string;
@@ -17,6 +19,7 @@ export type AttackModifierApplicationResult = {
   relicAttackBonus: number;
   appliedRelicIds: string[];
   appliedModifiers: AppliedAttackModifier[];
+  attackResult?: AttackResult;
 };
 
 export type RuleSetModifierApplicationResult = {
@@ -27,6 +30,7 @@ export type RuleSetModifierApplicationResult = {
 
 export class EffectResolver {
   applyAttackModifiers(baseAttack: number, relics: RelicDefinition[], context: Omit<ModifierContext, "attack">): number;
+  applyAttackModifiers(baseAttack: AttackResult, relics: RelicDefinition[], context: Omit<ModifierContext, "attack">): AttackResult;
   applyAttackModifiers(
     baseAttack: number,
     relics: RelicDefinition[],
@@ -34,11 +38,21 @@ export class EffectResolver {
     options: { includeDetails: true },
   ): AttackModifierApplicationResult;
   applyAttackModifiers(
-    baseAttack: number,
+    baseAttack: AttackResult,
+    relics: RelicDefinition[],
+    context: Omit<ModifierContext, "attack">,
+    options: { includeDetails: true },
+  ): AttackModifierApplicationResult;
+  applyAttackModifiers(
+    baseAttack: number | AttackResult,
     relics: RelicDefinition[],
     context: Omit<ModifierContext, "attack">,
     options?: { includeDetails: true },
-  ): number | AttackModifierApplicationResult {
+  ): number | AttackResult | AttackModifierApplicationResult {
+    if (typeof baseAttack !== "number") {
+      return this.applyAttackResultModifiers(baseAttack, relics, context, options);
+    }
+
     const preRelicAttack = sanitizeAttack(baseAttack);
     const appliedModifiers: AppliedAttackModifier[] = [];
     const attack = relics.reduce((currentAttack, relic) => {
@@ -67,6 +81,76 @@ export class EffectResolver {
       relicAttackBonus: attack - preRelicAttack,
       appliedRelicIds: [...new Set(appliedModifiers.map((modifier) => modifier.relicId))],
       appliedModifiers,
+    };
+  }
+
+  private applyAttackResultModifiers(
+    attackResult: AttackResult,
+    relics: RelicDefinition[],
+    context: Omit<ModifierContext, "attack">,
+    options?: { includeDetails: true },
+  ): AttackResult | AttackModifierApplicationResult {
+    const preRelicAttack = sanitizeAttack(attackResult.finalDamage);
+    const appliedModifiers: AppliedAttackModifier[] = [];
+    let breakdown: AttackBreakdown = { ...attackResult.breakdown };
+
+    for (const relic of relics) {
+      for (const modifier of relic.modifiers) {
+        if (modifier.trigger !== "onAttackCalculated") continue;
+        if (!modifierApplies(modifier, { ...context, attack: breakdown.finalDamage })) continue;
+        const beforeAttack = breakdown.finalDamage;
+        breakdown = calculateAttackBreakdown({
+          ...breakdown,
+          typeBonus:
+            breakdown.typeBonus +
+            sanitizeBonus(modifier.typeBonusAdd) +
+            multiplierToBonus(modifier.attackMultiplier),
+          stateBonus: breakdown.stateBonus + sanitizeBonus(modifier.stateBonusAdd),
+          speedBonus: breakdown.speedBonus + sanitizeBonus(modifier.speedBonusAdd),
+          comboDamage: breakdown.comboDamage + sanitizeFlatBonus(modifier.comboDamageAdd),
+          comboDamageMultiplier: breakdown.comboDamageMultiplier + sanitizeBonus(modifier.comboDamageMultiplierAdd),
+          b2bDamage: breakdown.b2bDamage + sanitizeFlatBonus(modifier.b2bDamageAdd),
+          b2bDamageMultiplier: breakdown.b2bDamageMultiplier + sanitizeBonus(modifier.b2bDamageMultiplierAdd),
+          perfectClearDamage: breakdown.perfectClearDamage + sanitizeFlatBonus(modifier.perfectClearDamageAdd),
+          perfectClearDamageMultiplier:
+            breakdown.perfectClearDamageMultiplier + sanitizeBonus(modifier.perfectClearDamageMultiplierAdd),
+          flatBonus: breakdown.flatBonus + sanitizeFlatBonus(modifier.flatBonusAdd) + sanitizeFlatBonus(modifier.addAttack),
+          counterBonus: breakdown.counterBonus + sanitizeFlatBonus(modifier.counterBonusAdd),
+        });
+        if (breakdown.finalDamage === beforeAttack) continue;
+        appliedModifiers.push({
+          relicId: String(relic.id),
+          beforeAttack,
+          afterAttack: breakdown.finalDamage,
+          addAttack: modifier.addAttack ?? modifier.flatBonusAdd,
+          attackMultiplier: modifier.attackMultiplier,
+        });
+      }
+    }
+
+    const nextAttackResult: AttackResult = {
+      ...attackResult,
+      baseDamage: breakdown.baseScaledDamage,
+      comboBonus: breakdown.comboScaledDamage,
+      b2bBonus: breakdown.b2bScaledDamage,
+      perfectClearBonus: breakdown.perfectClearScaledDamage,
+      totalDamage: breakdown.finalDamage,
+      breakdown,
+      ...breakdown,
+      preRelicTotalDamage: preRelicAttack,
+      relicAttackBonus: breakdown.finalDamage - preRelicAttack,
+      appliedRelicIds: [...new Set(appliedModifiers.map((modifier) => modifier.relicId))],
+    };
+
+    if (!options?.includeDetails) return nextAttackResult;
+
+    return {
+      attack: nextAttackResult.finalDamage,
+      preRelicAttack,
+      relicAttackBonus: nextAttackResult.relicAttackBonus ?? 0,
+      appliedRelicIds: nextAttackResult.appliedRelicIds ?? [],
+      appliedModifiers,
+      attackResult: nextAttackResult,
     };
   }
 
@@ -130,6 +214,17 @@ function sanitizeAttack(value: number): number {
 function sanitizeFlatBonus(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value)) return 0;
   return value;
+}
+
+function sanitizeBonus(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 0;
+  return value;
+}
+
+function multiplierToBonus(value: number | undefined): number {
+  if (value === undefined) return 0;
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return value - 1;
 }
 
 function sanitizeMultiplier(value: number | undefined): number {

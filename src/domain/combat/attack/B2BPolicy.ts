@@ -1,17 +1,7 @@
 import type { SpinResult } from "../../tetris/SpinDetector";
 import type { AttackType } from "./AttackTypes";
 
-export type B2BPolicyConfig = {
-  bonusDamage: number;
-};
-
-export const defaultB2BPolicyConfig: B2BPolicyConfig = {
-  bonusDamage: 1,
-};
-
 export class B2BPolicy {
-  constructor(private readonly config: B2BPolicyConfig = defaultB2BPolicyConfig) {}
-
   isEligible(attackType: AttackType, lineClearCount: number, spinResult: SpinResult): boolean {
     if (lineClearCount <= 0) return false;
     if (attackType === "LineClear") return lineClearCount >= 4;
@@ -20,9 +10,9 @@ export class B2BPolicy {
     return false;
   }
 
-  bonusFor(baseDamage: number, isB2BEligible: boolean, wasB2BActive: boolean): number {
-    if (baseDamage < 1 || !isB2BEligible || !wasB2BActive) return 0;
-    return this.config.bonusDamage;
+  damageFor(baseDamage: number, isB2BEligible: boolean, b2bCount: number): number {
+    if (baseDamage < 1 || !isB2BEligible) return 0;
+    return Math.max(0, Math.round(Number.isFinite(b2bCount) ? b2bCount : 0));
   }
 
   nextActive(lineClearCount: number, isB2BEligible: boolean, wasB2BActive: boolean): boolean {

@@ -10,6 +10,8 @@ import type { RandomProvider } from "../domain/shared/RandomProvider";
 describe("Relic reward tables", () => {
   it("includes combatReward relics in the combat reward table", () => {
     expect(combatRelicIds()).toContain("tetris_power");
+    expect(combatRelicIds()).toContain("tsd_tst_power");
+    expect(combatRelicIds()).toContain("fast_tspin_power");
   });
 
   it("excludes shopOnly relics from the combat reward table", () => {

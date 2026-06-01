@@ -73,6 +73,29 @@ describe("AttackResultFactory", () => {
     expect(result.isPerfectClear).toBe(false);
     expect(result.totalDamage).toBe(10);
   });
+
+  it("rounds every damage bucket and then rounds final damage", () => {
+    const result = createBaseAttackResult({
+      lineClearCount: 4,
+      spinResult: noSpinResult(),
+      baseAttack: 3,
+      typeBonus: 0.16,
+      comboDamage: 1,
+      comboDamageMultiplier: 1.5,
+      b2bDamage: 1,
+      b2bDamageMultiplier: 1.5,
+      perfectClearDamage: 1,
+      perfectClearDamageMultiplier: 1.5,
+      flatBonus: 0.2,
+      counterBonus: 0.2,
+    });
+
+    expect(result.baseScaledDamage).toBe(3);
+    expect(result.comboScaledDamage).toBe(2);
+    expect(result.b2bScaledDamage).toBe(2);
+    expect(result.perfectClearScaledDamage).toBe(2);
+    expect(result.finalDamage).toBe(9);
+  });
 });
 
 function tSpin(grade: "Mini" | "Full"): SpinResult {

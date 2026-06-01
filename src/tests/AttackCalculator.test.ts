@@ -96,6 +96,40 @@ describe("AttackCalculator", () => {
     expect(noClear.b2bAfter).toBe(true);
   });
 
+  it.each([
+    [0, 0],
+    [1, 1],
+    [2, 2],
+    [3, 3],
+  ])("uses B2B stack %i as b2bDamage %i for eligible attacks", (b2bCount, expectedDamage) => {
+    const result = calculate({ lineClearCount: 4, wasB2BActive: b2bCount > 0, b2bCount });
+
+    expect(result.b2bDamage).toBe(expectedDamage);
+    expect(result.b2bScaledDamage).toBe(expectedDamage);
+  });
+
+  it.each([
+    [0, 0],
+    [1, 0.05],
+    [5, 0.25],
+    [10, 0.5],
+    [15, 0.5],
+  ])("calculates fastChain %i as speedBonus %f", (fastChain, expectedBonus) => {
+    const result = calculate({ lineClearCount: 4, fastChain });
+
+    expect(result.speedBonus).toBe(expectedBonus);
+  });
+
+  it("applies speedBonus only to baseAttack", () => {
+    const result = calculate({ lineClearCount: 4, comboBefore: 3, wasB2BActive: true, b2bCount: 2, isPerfectClear: true, fastChain: 10 });
+
+    expect(result.baseScaledDamage).toBe(6);
+    expect(result.comboScaledDamage).toBe(2);
+    expect(result.b2bScaledDamage).toBe(2);
+    expect(result.perfectClearScaledDamage).toBe(6);
+    expect(result.totalDamage).toBe(16);
+  });
+
   it("applies perfect clear bonus only when lines are cleared", () => {
     const tetris = calculate({ lineClearCount: 4, isPerfectClear: true });
     const single = calculate({ lineClearCount: 1, isPerfectClear: true });
@@ -149,6 +183,8 @@ function calculate(options: {
   isPerfectClear?: boolean;
   comboBefore?: number;
   wasB2BActive?: boolean;
+  b2bCount?: number;
+  fastChain?: number;
 }) {
   const input: AttackCalculationInput = {
     lineClearCount: options.lineClearCount,
@@ -156,6 +192,8 @@ function calculate(options: {
     isPerfectClear: options.isPerfectClear ?? false,
     comboBefore: options.comboBefore ?? 0,
     wasB2BActive: options.wasB2BActive ?? false,
+    b2bCount: options.b2bCount,
+    fastChain: options.fastChain,
   };
   return new AttackCalculator().calculate(input);
 }

@@ -1,6 +1,7 @@
 export { AttackCalculator } from "./attack/AttackCalculator";
 export type {
   AttackCalculationInput,
+  AttackBreakdown,
   AttackResult,
   AttackTag,
   AttackType,

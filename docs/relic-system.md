@@ -1,5 +1,70 @@
 # Relic System
 
+## Current Damage Formula
+
+공격 피해는 버킷별로 계산한 뒤 마지막에 합산한다. 모든 중간 scaled damage와 최종 피해는 `Math.round`로 반올림하고, 최종 피해는 최소 0으로 clamp한다.
+
+```ts
+baseScaledDamage = Math.round(baseAttack * (1 + typeBonus + stateBonus + speedBonus));
+comboScaledDamage = Math.round(comboDamage * comboDamageMultiplier);
+b2bScaledDamage = Math.round(b2bDamage * b2bDamageMultiplier);
+perfectClearScaledDamage = Math.round(perfectClearDamage * perfectClearDamageMultiplier);
+
+finalDamage = Math.max(
+  0,
+  Math.round(
+    baseScaledDamage +
+      comboScaledDamage +
+      b2bScaledDamage +
+      perfectClearScaledDamage +
+      flatBonus +
+      counterBonus,
+  ),
+);
+```
+
+| 필드 | 의미 |
+| --- | --- |
+| `baseAttack` | 라인 클리어/T-spin/All-spin 기본 피해 |
+| `typeBonus` | 기존 `attackMultiplier` 호환 보너스. `attackMultiplier: 1.25`는 `typeBonus += 0.25`로 해석한다. |
+| `stateBonus` | 상태 계열 baseAttack 전용 보너스 |
+| `speedBonus` | fastChain 기반 baseAttack 전용 보너스 |
+| `comboDamage` | 기존 ComboTable 구간형 콤보 피해 |
+| `comboDamageMultiplier` | comboDamage에만 적용되는 배율. 기본값 1 |
+| `b2bDamage` | B2B 대상 공격일 때 현재 B2B 스택 수만큼의 피해 |
+| `b2bDamageMultiplier` | b2bDamage에만 적용되는 배율. 기본값 1 |
+| `perfectClearDamage` | 기존 Perfect Clear 보너스 피해 |
+| `perfectClearDamageMultiplier` | perfectClearDamage에만 적용되는 배율. 기본값 1 |
+| `flatBonus` | 마지막 합산 단계에서 더하는 고정 피해. 기존 `addAttack`은 `flatBonus`로 해석한다. |
+| `counterBonus` | 마지막 합산 단계에서 더하는 카운터 피해 |
+
+B2B 기본 피해:
+
+- B2B 대상 공격이면 `b2bDamage = b2bCount`다.
+- B2B 스택 1/2/3은 각각 +1/+2/+3 피해가 된다.
+- B2B 대상 공격이 아니면 `b2bDamage = 0`이다.
+- `b2bCount`는 `ModifierContext`에 유지되어 유물 조건과 디버그에서 사용할 수 있다.
+- 기존 B2B +1 고정 보너스 구조는 스택 기반 `b2bDamage` 구조로 대체한다.
+
+Speed 기본 피해:
+
+- `speedBonus = Math.min(fastChain, 10) * 0.05`
+- fastChain 1당 `baseAttack` 피해 +5%, 최대 +50%다.
+- speedBonus는 comboDamage, b2bDamage, perfectClearDamage, flatBonus, counterBonus에는 적용하지 않는다.
+- `isFast`는 상태 표시와 기존 조건 호환용으로 유지하지만, Speed 유물 조건은 `fastChain`을 우선 사용한다.
+
+Combo/Perfect Clear:
+
+- ComboTable 구간형 값은 `comboDamage`로 본다: 0~1 = 0, 2~3 = 1, 4~5 = 2, 6~8 = 3, 9+ = 4.
+- 기존 Perfect Clear 보너스는 `perfectClearDamage`로 본다.
+
+Modifier 호환:
+
+- 기존 `attackMultiplier`는 baseAttack 계열 보너스로 해석한다.
+- 기존 `addAttack`은 `flatBonus`로 해석한다.
+- 전용 필드는 `comboDamageAdd`, `comboDamageMultiplierAdd`, `b2bDamageAdd`, `b2bDamageMultiplierAdd`, `perfectClearDamageAdd`, `perfectClearDamageMultiplierAdd`, `flatBonusAdd`, `counterBonusAdd`를 사용할 수 있다.
+- Tetris/T-spin처럼 공격 종류 자체를 강화하는 유물은 `attackMultiplier` 대신 `typeBonusAdd`를 사용한다. 예: +25%는 `typeBonusAdd: 0.25`.
+
 이 문서는 현재 구현된 유물 시스템의 데이터 구조, 적용 흐름, 보상 풀 정책을 정리한다.
 새 유물을 추가하거나 기존 유물을 조정할 때 이 문서를 기준으로 확인한다.
 
@@ -109,16 +174,30 @@ current * attackMultiplier + addAttack
 | `tetris_overwhelm` | 강한 테트리스 | `tetris` | `rare` | Tetris 공격 피해 +50% |
 | `spin_pierce` | T-spin 강화 | `spin` | `common` | T-spin 공격 피해 +25% |
 | `mini_spin_bonus` | Mini Spin 추가타 | `spin` | `common` | T-spin Mini 공격에 추가 피해 +1 |
+| `tsd_tst_power` | TSD/TST 강화 | `spin` | `rare` | T-spin Double 또는 Triple 공격 피해 +25% |
 | `b2b_flat_bonus` | B2B 추가타 | `b2b` | `common` | B2B 공격에 추가 피해 +1 |
 | `b2b_pressure` | B2B 공격 강화 | `b2b` | `uncommon` | B2B 공격 피해 +25% |
+| `b2b_maintain_power` | B2B 유지 강화 | `b2b` | `uncommon` | B2B 유지 중 공격 피해 +15% |
 | `combo_attack` | 콤보 보너스 증가 | `combo` | `common` | Combo 2 이상 또는 comboBonus 1 이상 추가 피해 +1 |
 | `long_combo_flow` | 9콤보 보너스 증가 | `combo` | `rare` | Combo 9 이상 추가 피해 +2 |
+| `combo_4_bonus` | 4콤보 추가 보너스 | `combo` | `uncommon` | Combo 4 이상 추가 피해 +1 |
+| `combo_small_attack_bonus` | 콤보 중 소공격 추가타 | `combo` | `common` | Combo 중 Single 또는 Double 추가 피해 +1 |
+| `low_field_combo_bonus` | 낮은 필드 콤보 보너스 | `combo` | `uncommon` | 낮은 필드 Combo 추가 피해 +1 |
 | `danger_power` | Danger 공격 강화 | `danger` | `uncommon` | Danger 상태 공격 피해 +50% |
 | `high_stack_counter` | Danger 큰공격 강화 | `danger` | `uncommon` | Danger 상태의 Tetris 또는 T-spin 공격 피해 +25% |
+| `danger_line_bonus` | Danger 줄제거 추가타 | `danger` | `common` | Danger 상태 줄 제거 추가 피해 +1 |
+| `danger_combo_power` | Danger 콤보 강화 | `danger` | `uncommon` | Danger 상태 Combo 추가 피해 +1 |
 | `hole_power` | Hole 보유 공격 강화 | `hole` | `common` | hole 3개 이상 공격 피해 +25% |
 | `broken_field_power` | Hole 다수 공격 강화 | `hole` | `rare` | hole 5개 이상 공격 피해 +50% |
+| `hole_tspin_power` | Hole T-spin 강화 | `hole` | `uncommon` | Hole 보유 상태 T-spin 공격 피해 +25% |
+| `low_field_power` | 낮은 필드 공격 강화 | `perfectClear` | `uncommon` | 낮은 필드 공격 피해 +20% |
+| `clean_field_power` | 안정 필드 공격 강화 | `perfectClear` | `uncommon` | Hole이 없고 낮은 필드면 공격 피해 +25% |
 | `fast_power` | Fast 공격 강화 | `speed` | `common` | Fast 상태 공격 피해 +25% |
 | `fast_chain_power` | FastChain 누적 강화 | `speed` | `uncommon` | Fast Chain 3 이상 공격 피해 +25% |
+| `fast_strong_attack` | Fast 강공격 | `speed` | `rare` | Fast 상태 공격 피해 +35% |
+| `fast_combo_bonus` | Fast 콤보 보너스 | `speed` | `uncommon` | Fast 상태 Combo 추가 피해 +1 |
+| `fast_line_bonus` | Fast 줄제거 추가타 | `speed` | `common` | Fast 상태 줄 제거 추가 피해 +1 |
+| `fast_tspin_power` | Fast T-spin 강화 | `speed` | `uncommon` | Fast 상태 T-spin 공격 피해 +25% |
 | `garbage_absorb` | 대기 Garbage 강화 | `garbage` | `common` | 대기 garbage 3줄 이상 공격 피해 +25% |
 | `garbage_surge` | 대기 Garbage 누적 강화 | `garbage` | `rare` | 대기 garbage 6줄 이상 공격 피해 +35% |
 
@@ -277,13 +356,18 @@ current * attackMultiplier + addAttack
 
 ## 아직 구현하지 않은 것
 
-- 이벤트형 유물
-- 다음 공격 강화
-- B2B 끊김 방지
-- 전투 시작 후 시간제 버프
-- 사망 직전 생존
+- 보스 조건 유물: `isBoss` ModifierContext 필요. `boss_tetris_power`, `boss_tspin_power`, `boss_b2b_power`, `boss_combo_power`, `boss_danger_power`, `boss_fast_power`, `boss_garbage_counter`.
+- 미노 종류 조건 유물: `usedPieceType` 또는 `pieceType` ModifierContext 필요. `i_piece_line_bonus`, `t_piece_line_power`, `hard_drop_bonus` 일부.
+- B2B 카운트 조건 유물: `b2bCount` ModifierContext 필요. `b2b_3_power`, `b2b_bonus_plus`, B2B 누적 스케일형.
+- Perfect Clear 조건 유물: `isPerfectClear` ModifierContext 필요. `perfect_clear_power` 및 PC 후속/누적/보스 유물.
+- 이벤트형/다음 공격 버프 유물: 이벤트 훅과 next attack buff 저장소 필요. 테트리스/T-spin 후속 강화, Hold 후 공격 강화, Hold 후 추가타, 콤보 끊김 방지, 콤보 종료 폭발, B2B 끊김 방지, 첫 B2B 강화.
+- Garbage 상쇄/수신형 유물: `canceledGarbageLines`, garbage received event, counterBonus modifier 필요. 테트리스/T-spin/Danger/Hole/안정 필드 상쇄 보너스, Garbage 수신 후 강화, 상쇄량 피해.
+- 시간제/전투 중 조건부 RuleSet 유물: 전투 중 조건부 RuleSet 재평가 또는 시간제 버프 필요. 초반 Gravity 감소, Danger Lock Delay 증가, Danger 빠른 낙하 강화, 전투 시작 후 시간제 버프.
+- spawn delay 유물: `spawnDelayMs` RuleSet modifier 필요. 고정 후 생성 지연.
+- 랜덤/확률형 유물: 확률 판정 시스템과 랜덤 효과 정의 필요. 랜덤 피해 배율, 확률 추가타, 확률 2배 공격, 확률 Garbage 감소, 랜덤 유형 강화, 랜덤 미노 추가타, 공격 강화 Garbage 증가, 확률 B2B 유지, 콤보 강화 실패 페널티, 확률 생존.
+- 사망 직전 생존형 유물: top out 직전 생존 이벤트 훅 필요.
 - `extra_hold_slot` / Hold 슬롯 +1 재활성화. 현재 Hold 도메인, 입력, UI가 다중 슬롯을 완전 지원하지 않아 `obtainSource: "disabled"`로 임시 비활성화되어 있다. 추후 Hold 구조를 다중 슬롯 기준으로 확장한 뒤 재활성화한다.
-- `deepHoleCount` 실제 계산
+- `deepHoleCount` 실제 계산. Deep Hole 제거 추가타 및 관련 Hole 유물은 계산 기반 필요.
 - rarity 확률 가중치
 
 `rarity`는 현재 의도적으로 확률에 사용하지 않는다.

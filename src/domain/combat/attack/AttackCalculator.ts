@@ -19,7 +19,8 @@ export class AttackCalculator {
     const comboAfter = this.comboTable.nextCount(input.lineClearCount, input.comboBefore);
     const comboBonus = this.comboTable.bonusFor(input.lineClearCount, comboAfter);
     const isB2BEligible = this.b2bPolicy.isEligible(attackType, input.lineClearCount, input.spinResult);
-    const b2bBonus = this.b2bPolicy.bonusFor(baseDamage, isB2BEligible, input.wasB2BActive);
+    const b2bCount = input.b2bCount ?? (input.wasB2BActive ? 1 : 0);
+    const b2bBonus = this.b2bPolicy.damageFor(baseDamage, isB2BEligible, b2bCount);
     const b2bAfter = this.b2bPolicy.nextActive(input.lineClearCount, isB2BEligible, input.wasB2BActive);
     const perfectClearBonus = this.perfectClearBonusTable.bonusFor(input.isPerfectClear, input.lineClearCount);
 
@@ -27,15 +28,22 @@ export class AttackCalculator {
       lineClearCount: input.lineClearCount,
       spinResult: input.spinResult,
       isPerfectClear: input.isPerfectClear,
-      baseDamage,
-      comboBonus,
-      b2bBonus,
-      perfectClearBonus,
+      baseAttack: baseDamage,
+      speedBonus: speedBonusFor(input.fastChain ?? 0),
+      comboDamage: comboBonus,
+      b2bDamage: b2bBonus,
+      perfectClearDamage: perfectClearBonus,
       comboBefore: input.comboBefore,
       comboAfter,
       wasB2BActive: input.wasB2BActive,
       isB2BEligible,
+      b2bCount,
       b2bAfter,
     });
   }
+}
+
+export function speedBonusFor(fastChain: number): number {
+  if (!Number.isFinite(fastChain)) return 0;
+  return Math.min(Math.max(0, Math.floor(fastChain)), 10) * 0.05;
 }

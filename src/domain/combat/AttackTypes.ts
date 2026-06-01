@@ -1,5 +1,6 @@
 export type {
   AttackCalculationInput,
+  AttackBreakdown,
   AttackResult,
   AttackTag,
   AttackType,

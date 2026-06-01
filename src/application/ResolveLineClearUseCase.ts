@@ -46,6 +46,8 @@ export class ResolveLineClearUseCase {
       isPerfectClear,
       comboBefore: Math.max(0, state.combat.player.combo),
       wasB2BActive: state.combat.player.backToBackActive,
+      b2bCount: state.combat.player.backToBackCount,
+      fastChain: state.combat.player.fastChainCount,
     });
     const attackFieldState = new FieldAnalyzer().analyze(state.combat.player.board);
     const garbageQueue = new GarbageQueue(
@@ -56,11 +58,12 @@ export class ResolveLineClearUseCase {
           : []),
     );
     const relicAttack = new EffectResolver().applyAttackModifiers(
-      baseAttack.totalDamage,
+      baseAttack,
       state.run.relicInventory.getDefinitions(),
       {
         linesCleared,
         backToBackActive: state.combat.player.backToBackActive,
+        b2bCount: state.combat.player.backToBackCount,
         isDanger: attackFieldState.dangerLevel === "Danger" || attackFieldState.dangerLevel === "Critical",
         fieldHeight: attackFieldState.maxHeight,
         holdUsedThisBattle: state.combat.player.holdUsedThisBattle,
@@ -73,13 +76,13 @@ export class ResolveLineClearUseCase {
         isTSpinFull: clearResult.isTSpin && !clearResult.isTSpinMini,
         combo: baseAttack.comboAfter,
         comboBonus: baseAttack.comboBonus,
+        comboDamage: baseAttack.comboDamage,
         attackKind: baseAttack.attackType,
       },
       { includeDetails: true },
     );
     const attack = {
-      ...baseAttack,
-      totalDamage: relicAttack.attack,
+      ...(relicAttack.attackResult ?? baseAttack),
       preRelicTotalDamage: relicAttack.preRelicAttack,
       relicAttackBonus: relicAttack.relicAttackBonus,
       appliedRelicIds: relicAttack.appliedRelicIds,
@@ -154,7 +157,7 @@ export class ResolveLineClearUseCase {
       ...(comboB2BResult.isBackToBack !== state.combat.player.backToBackActive ? [{ type: "BackToBackChanged" as const, active: comboB2BResult.isBackToBack }] : []),
       {
         type: "AttackCalculated",
-        baseAttack: attack.baseDamage,
+        baseAttack: attack.baseAttack,
         finalAttack: attack.totalDamage,
         baseDamage: attack.baseDamage,
         totalDamage: attack.totalDamage,
