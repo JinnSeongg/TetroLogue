@@ -1,3 +1,6 @@
+export const DEFAULT_SPEED_BONUS_PER_STACK = 0.01;
+export const DEFAULT_SPEED_BONUS_CAP = 20;
+
 export type TetrisRuleSet = {
   boardWidth: number;
   boardHeight: number;
@@ -11,6 +14,8 @@ export type TetrisRuleSet = {
   maxLockResets: number;
   fastChainWindowMs: number;
   fastStateThreshold: number;
+  speedBonusPerStack: number;
+  speedBonusCap: number;
   ghostPieceEnabled: boolean;
   keepBackToBackOnEmptyTSpin: boolean;
 };
@@ -28,6 +33,8 @@ export const standardRuleSet: TetrisRuleSet = {
   maxLockResets: 15,
   fastChainWindowMs: 1000,
   fastStateThreshold: 3,
+  speedBonusPerStack: DEFAULT_SPEED_BONUS_PER_STACK,
+  speedBonusCap: DEFAULT_SPEED_BONUS_CAP,
   ghostPieceEnabled: true,
   keepBackToBackOnEmptyTSpin: true,
 };

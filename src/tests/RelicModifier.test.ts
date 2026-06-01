@@ -70,6 +70,60 @@ describe("Relic modifiers", () => {
     expect(result.attackResult?.perfectClearScaledDamage).toBe(5);
   });
 
+  it("applies tetris_focus_tradeoff only to Tetris attacks as positive typeBonus", () => {
+    const result = new EffectResolver().applyAttackModifiers(createReferenceAttackResult(), [relicDefinitions.tetris_focus_tradeoff], {
+      linesCleared: 4,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+
+    expect(result.typeBonus).toBe(0.3);
+    expect(result.baseScaledDamage).toBe(13);
+    expect(result.totalDamage).toBe(28);
+  });
+
+  it("applies tetris_focus_tradeoff only to T-spin attacks as negative typeBonus", () => {
+    const result = new EffectResolver().applyAttackModifiers(createReferenceAttackResult(), [relicDefinitions.tetris_focus_tradeoff], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: true,
+    });
+
+    expect(result.typeBonus).toBe(-0.3);
+    expect(result.baseScaledDamage).toBe(7);
+    expect(result.totalDamage).toBe(22);
+  });
+
+  it("does not apply tetris_focus_tradeoff to normal Single or Double attacks", () => {
+    const resolver = new EffectResolver();
+    const single = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 1 }), [relicDefinitions.tetris_focus_tradeoff], {
+      linesCleared: 1,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const double = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 2 }), [relicDefinitions.tetris_focus_tradeoff], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+
+    expect(single.totalDamage).toBe(1);
+    expect(double.totalDamage).toBe(1);
+    expect(single.typeBonus).toBe(0);
+    expect(double.typeBonus).toBe(0);
+  });
+
+  it("keeps tetris_focus_tradeoff T-spin penalty clamped to non-negative final damage", () => {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 0, linesCleared: 0 }), [relicDefinitions.tetris_focus_tradeoff], {
+      linesCleared: 0,
+      backToBackActive: false,
+      isTSpin: true,
+    });
+
+    expect(result.typeBonus).toBe(-0.3);
+    expect(result.totalDamage).toBe(0);
+  });
+
   it("applies bucket-specific relic modifiers to only their own damage buckets", () => {
     const result = new EffectResolver().applyAttackModifiers(
       createAttackResult({
@@ -160,7 +214,6 @@ describe("Relic modifiers", () => {
       28,
     ],
     ["compressed_preview", relicDefinitions.compressed_preview, { linesCleared: 4, backToBackActive: false }, 0.2, 12, 27],
-    ["fast_strong_attack", relicDefinitions.fast_strong_attack, { linesCleared: 4, backToBackActive: false, fastChain: 3 }, 0.35, 14, 29],
   ] as const)("applies %s as stateBonusAdd only to baseAttack", (_id, relic, context, expectedStateBonus, expectedBase, expectedFinal) => {
     const result = new EffectResolver().applyAttackModifiers(createReferenceAttackResult(), [relic], context, {
       includeDetails: true,
@@ -220,21 +273,15 @@ describe("Relic modifiers", () => {
     expect(danger.totalDamage).toBe(6);
   });
 
-  it("applies fast_power only when fastChain context reaches 1", () => {
+  it("does not apply fast_power as a direct attack modifier", () => {
     const resolver = new EffectResolver();
-    const normal = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_power], {
-      linesCleared: 4,
-      backToBackActive: false,
-      fastChain: 0,
-    });
     const fast = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_power], {
       linesCleared: 4,
       backToBackActive: false,
-      fastChain: 1,
+      fastChain: 20,
     });
 
-    expect(normal.totalDamage).toBe(4);
-    expect(fast.totalDamage).toBe(5);
+    expect(fast.totalDamage).toBe(4);
   });
 
   it("applies compressed_preview as an unconditional attack multiplier", () => {
@@ -336,14 +383,14 @@ describe("Relic modifiers", () => {
     expect(result.totalDamage).toBe(5);
   });
 
-  it("applies fast_chain_power when fastChain is at least 3", () => {
+  it("does not apply fast_chain_power as a direct attack modifier", () => {
     const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_chain_power], {
       linesCleared: 4,
       backToBackActive: false,
-      fastChain: 3,
+      fastChain: 30,
     });
 
-    expect(result.totalDamage).toBe(5);
+    expect(result.totalDamage).toBe(4);
   });
 
   it("applies garbage_absorb when pendingGarbageLines is at least 3", () => {
@@ -361,7 +408,6 @@ describe("Relic modifiers", () => {
       4,
       [
         relicDefinitions.hole_power,
-        relicDefinitions.fast_chain_power,
         relicDefinitions.garbage_absorb,
         relicDefinitions.holdless_focus,
       ],
@@ -568,35 +614,63 @@ describe("Relic modifiers", () => {
   });
 
   it("applies new Fast relics for fast line, combo, and T-spin attacks", () => {
+    const notStrong = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 20 }), [relicDefinitions.fast_strong_attack], {
+      linesCleared: 1,
+      backToBackActive: false,
+      fastChain: 19,
+    });
     const strong = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 20 }), [relicDefinitions.fast_strong_attack], {
       linesCleared: 1,
       backToBackActive: false,
-      fastChain: 3,
+      fastChain: 20,
+    });
+    const notCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_combo_bonus], {
+      linesCleared: 1,
+      backToBackActive: false,
+      fastChain: 9,
+      combo: 2,
     });
     const combo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_combo_bonus], {
       linesCleared: 1,
       backToBackActive: false,
-      fastChain: 3,
+      fastChain: 10,
       combo: 2,
+    });
+    const notLine = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_line_bonus], {
+      linesCleared: 1,
+      backToBackActive: false,
+      fastChain: 9,
     });
     const line = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_line_bonus], {
       linesCleared: 1,
       backToBackActive: false,
-      fastChain: 3,
+      fastChain: 10,
+    });
+    const notTSpin = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.fast_tspin_power], {
+      linesCleared: 2,
+      backToBackActive: false,
+      fastChain: 9,
+      isTSpin: true,
     });
     const tSpin = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.fast_tspin_power], {
       linesCleared: 2,
       backToBackActive: false,
-      fastChain: 3,
+      fastChain: 10,
       isTSpin: true,
     });
 
-    expect(strong.totalDamage).toBe(27);
+    expect(notStrong.totalDamage).toBe(20);
+    expect(strong.totalDamage).toBe(22);
+    expect(strong.flatBonus).toBe(2);
+    expect(notCombo.totalDamage).toBe(4);
     expect(combo.totalDamage).toBe(5);
     expect(combo.comboDamage).toBe(1);
+    expect(notLine.totalDamage).toBe(4);
     expect(line.totalDamage).toBe(5);
     expect(line.flatBonus).toBe(1);
+    expect(notTSpin.totalDamage).toBe(4);
     expect(tSpin.totalDamage).toBe(5);
+    expect(tSpin.typeBonus).toBe(0.25);
   });
 
   it("can use GarbageQueue total amount as pending garbage context", () => {

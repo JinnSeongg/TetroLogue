@@ -34,6 +34,8 @@ export type AttackCalculationInput = {
   wasB2BActive: boolean;
   b2bCount?: number;
   fastChain?: number;
+  speedBonusPerStack?: number;
+  speedBonusCap?: number;
 };
 
 export type AttackBreakdown = {

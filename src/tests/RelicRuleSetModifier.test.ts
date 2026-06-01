@@ -74,6 +74,20 @@ describe("Relic rule set modifiers", () => {
     expect(result.lockDelayMs).toBe(200);
   });
 
+  it("applies fast_power as +0.01 speed bonus per stack", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.fast_power]);
+
+    expect(result.speedBonusPerStack).toBe(0.02);
+    expect(result.speedBonusCap).toBe(20);
+  });
+
+  it("applies fast_chain_power as +10 speed bonus cap", () => {
+    const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.fast_chain_power]);
+
+    expect(result.speedBonusPerStack).toBe(0.01);
+    expect(result.speedBonusCap).toBe(30);
+  });
+
   it("does not mutate the base rule set", () => {
     const baseRuleSet = createBaseRuleSet();
     const before = { ...baseRuleSet };
@@ -83,6 +97,7 @@ describe("Relic rule set modifiers", () => {
       relicDefinitions.delayed_lock,
       relicDefinitions.compressed_preview,
       relicDefinitions.no_hold_focus,
+      relicDefinitions.fast_power,
     ]);
 
     expect(baseRuleSet).toEqual(before);

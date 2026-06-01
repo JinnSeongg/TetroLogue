@@ -48,6 +48,8 @@ export class ResolveLineClearUseCase {
       wasB2BActive: state.combat.player.backToBackActive,
       b2bCount: state.combat.player.backToBackCount,
       fastChain: state.combat.player.fastChainCount,
+      speedBonusPerStack: state.combat.ruleSet.speedBonusPerStack,
+      speedBonusCap: state.combat.ruleSet.speedBonusCap,
     });
     const attackFieldState = new FieldAnalyzer().analyze(state.combat.player.board);
     const garbageQueue = new GarbageQueue(

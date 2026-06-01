@@ -1,7 +1,7 @@
 import { modifierApplies, type ModifierContext } from "./Modifier";
 import type { RelicDefinition } from "./RelicDefinition";
 import { normalizeMaxHoldSlots } from "../tetris/HoldSlot";
-import type { TetrisRuleSet } from "../tetris/TetrisRuleSet";
+import { DEFAULT_SPEED_BONUS_CAP, DEFAULT_SPEED_BONUS_PER_STACK, type TetrisRuleSet } from "../tetris/TetrisRuleSet";
 import type { AttackBreakdown, AttackResult } from "../combat/AttackTypes";
 import { calculateAttackBreakdown } from "../combat/attack/AttackResultFactory";
 
@@ -188,6 +188,8 @@ export class EffectResolver {
           nextPreviewCount: current.nextPreviewCount + sanitizeRuleSetAdd(modifier.nextPreviewCountAdd),
           holdEnabled: modifier.holdEnabledOverride ?? current.holdEnabled,
           maxHoldSlots: resolveNextMaxHoldSlots(current.maxHoldSlots, modifier.maxHoldSlots, modifier.maxHoldSlotsAdd),
+          speedBonusPerStack: current.speedBonusPerStack + sanitizeRuleSetAdd(modifier.speedBonusPerStackAdd),
+          speedBonusCap: current.speedBonusCap + sanitizeRuleSetAdd(modifier.speedBonusCapAdd),
         });
         if (ruleSetChanged(current, next)) {
           appliedRuleRelicIds.push(String(relic.id));
@@ -240,6 +242,8 @@ function sanitizeRuleSet(ruleSet: TetrisRuleSet): TetrisRuleSet {
     lockDelayMs: clampInteger(ruleSet.lockDelayMs, 0),
     nextPreviewCount: clampInteger(ruleSet.nextPreviewCount, 1),
     maxHoldSlots: normalizeMaxHoldSlots(ruleSet.maxHoldSlots),
+    speedBonusPerStack: clampNumber(ruleSet.speedBonusPerStack, DEFAULT_SPEED_BONUS_PER_STACK, 0),
+    speedBonusCap: clampInteger(ruleSet.speedBonusCap, 0),
   };
 }
 
@@ -263,12 +267,19 @@ function clampInteger(value: number, min: number): number {
   return Math.max(min, Math.round(value));
 }
 
+function clampNumber(value: number, fallback: number, min: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, value);
+}
+
 function ruleSetChanged(before: TetrisRuleSet, after: TetrisRuleSet): boolean {
   return (
     before.gravityMs !== after.gravityMs ||
     before.lockDelayMs !== after.lockDelayMs ||
     before.nextPreviewCount !== after.nextPreviewCount ||
     before.holdEnabled !== after.holdEnabled ||
-    before.maxHoldSlots !== after.maxHoldSlots
+    before.maxHoldSlots !== after.maxHoldSlots ||
+    before.speedBonusPerStack !== after.speedBonusPerStack ||
+    before.speedBonusCap !== after.speedBonusCap
   );
 }

@@ -66,6 +66,8 @@ export type PassiveModifier = {
   lockDelayMsAdd?: number;
   nextPreviewCountAdd?: number;
   holdEnabledOverride?: boolean;
+  speedBonusPerStackAdd?: number;
+  speedBonusCapAdd?: number;
 };
 
 export type Modifier = AttackModifier | PassiveModifier;

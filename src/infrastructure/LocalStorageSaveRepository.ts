@@ -335,5 +335,7 @@ function normalizeRuleSet(ruleSet: TetrisRuleSet | undefined, stats: EnemyCalcul
     fastChainWindowMs: ruleSet?.fastChainWindowMs ?? fallback.fastChainWindowMs,
     fastStateThreshold: ruleSet?.fastStateThreshold ?? fallback.fastStateThreshold,
     maxHoldSlots: ruleSet?.maxHoldSlots ?? fallback.maxHoldSlots,
+    speedBonusPerStack: ruleSet?.speedBonusPerStack ?? fallback.speedBonusPerStack,
+    speedBonusCap: ruleSet?.speedBonusCap ?? fallback.speedBonusCap,
   };
 }

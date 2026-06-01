@@ -110,10 +110,10 @@ describe("AttackCalculator", () => {
 
   it.each([
     [0, 0],
-    [1, 0.05],
-    [5, 0.25],
-    [10, 0.5],
-    [15, 0.5],
+    [1, 0.01],
+    [5, 0.05],
+    [20, 0.2],
+    [30, 0.2],
   ])("calculates fastChain %i as speedBonus %f", (fastChain, expectedBonus) => {
     const result = calculate({ lineClearCount: 4, fastChain });
 
@@ -121,13 +121,20 @@ describe("AttackCalculator", () => {
   });
 
   it("applies speedBonus only to baseAttack", () => {
-    const result = calculate({ lineClearCount: 4, comboBefore: 3, wasB2BActive: true, b2bCount: 2, isPerfectClear: true, fastChain: 10 });
+    const result = calculate({ lineClearCount: 4, comboBefore: 3, wasB2BActive: true, b2bCount: 2, isPerfectClear: true, fastChain: 20 });
 
-    expect(result.baseScaledDamage).toBe(6);
+    expect(result.baseScaledDamage).toBe(5);
     expect(result.comboScaledDamage).toBe(2);
     expect(result.b2bScaledDamage).toBe(2);
     expect(result.perfectClearScaledDamage).toBe(6);
-    expect(result.totalDamage).toBe(16);
+    expect(result.totalDamage).toBe(15);
+  });
+
+  it("uses configured speed bonus per stack and cap", () => {
+    const result = calculate({ lineClearCount: 4, fastChain: 30, speedBonusPerStack: 0.02, speedBonusCap: 30 });
+
+    expect(result.speedBonus).toBe(0.6);
+    expect(result.baseScaledDamage).toBe(6);
   });
 
   it("applies perfect clear bonus only when lines are cleared", () => {
@@ -185,6 +192,8 @@ function calculate(options: {
   wasB2BActive?: boolean;
   b2bCount?: number;
   fastChain?: number;
+  speedBonusPerStack?: number;
+  speedBonusCap?: number;
 }) {
   const input: AttackCalculationInput = {
     lineClearCount: options.lineClearCount,
@@ -194,6 +203,8 @@ function calculate(options: {
     wasB2BActive: options.wasB2BActive ?? false,
     b2bCount: options.b2bCount,
     fastChain: options.fastChain,
+    speedBonusPerStack: options.speedBonusPerStack,
+    speedBonusCap: options.speedBonusCap,
   };
   return new AttackCalculator().calculate(input);
 }

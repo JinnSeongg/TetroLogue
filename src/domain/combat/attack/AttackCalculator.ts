@@ -4,6 +4,7 @@ import { B2BPolicy } from "./B2BPolicy";
 import { ComboTable } from "./ComboTable";
 import { PerfectClearBonusTable } from "./PerfectClearBonusTable";
 import type { AttackCalculationInput, AttackResult } from "./AttackTypes";
+import { DEFAULT_SPEED_BONUS_CAP, DEFAULT_SPEED_BONUS_PER_STACK } from "../../tetris/TetrisRuleSet";
 
 export class AttackCalculator {
   constructor(
@@ -29,7 +30,7 @@ export class AttackCalculator {
       spinResult: input.spinResult,
       isPerfectClear: input.isPerfectClear,
       baseAttack: baseDamage,
-      speedBonus: speedBonusFor(input.fastChain ?? 0),
+      speedBonus: speedBonusFor(input.fastChain ?? 0, input.speedBonusPerStack, input.speedBonusCap),
       comboDamage: comboBonus,
       b2bDamage: b2bBonus,
       perfectClearDamage: perfectClearBonus,
@@ -43,7 +44,13 @@ export class AttackCalculator {
   }
 }
 
-export function speedBonusFor(fastChain: number): number {
+export function speedBonusFor(
+  fastChain: number,
+  speedBonusPerStack = DEFAULT_SPEED_BONUS_PER_STACK,
+  speedBonusCap = DEFAULT_SPEED_BONUS_CAP,
+): number {
   if (!Number.isFinite(fastChain)) return 0;
-  return Math.min(Math.max(0, Math.floor(fastChain)), 10) * 0.05;
+  const perStack = Number.isFinite(speedBonusPerStack) ? Math.max(0, speedBonusPerStack) : DEFAULT_SPEED_BONUS_PER_STACK;
+  const cap = Number.isFinite(speedBonusCap) ? Math.max(0, Math.floor(speedBonusCap)) : DEFAULT_SPEED_BONUS_CAP;
+  return Math.min(Math.max(0, Math.floor(fastChain)), cap) * perStack;
 }
