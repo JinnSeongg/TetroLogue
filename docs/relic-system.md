@@ -26,7 +26,7 @@ finalDamage = Math.max(
 | 필드 | 의미 |
 | --- | --- |
 | `baseAttack` | 라인 클리어/T-spin/All-spin 기본 피해 |
-| `typeBonus` | 기존 `attackMultiplier` 호환 보너스. `attackMultiplier: 1.25`는 `typeBonus += 0.25`로 해석한다. |
+| `typeBonus` | 공격 종류 강화 보너스. 예: `typeBonusAdd: 0.25` |
 | `stateBonus` | 상태 계열 baseAttack 전용 보너스 |
 | `speedBonus` | fastChain 기반 baseAttack 전용 보너스 |
 | `comboDamage` | 기존 ComboTable 구간형 콤보 피해 |
@@ -35,7 +35,7 @@ finalDamage = Math.max(
 | `b2bDamageMultiplier` | b2bDamage에만 적용되는 배율. 기본값 1 |
 | `perfectClearDamage` | 기존 Perfect Clear 보너스 피해 |
 | `perfectClearDamageMultiplier` | perfectClearDamage에만 적용되는 배율. 기본값 1 |
-| `flatBonus` | 마지막 합산 단계에서 더하는 고정 피해. 기존 `addAttack`은 `flatBonus`로 해석한다. |
+| `flatBonus` | 마지막 합산 단계에서 더하는 고정 피해. 예: `flatBonusAdd: 1` |
 | `counterBonus` | 마지막 합산 단계에서 더하는 카운터 피해 |
 
 B2B 기본 피해:
@@ -58,12 +58,16 @@ Combo/Perfect Clear:
 - ComboTable 구간형 값은 `comboDamage`로 본다: 0~1 = 0, 2~3 = 1, 4~5 = 2, 6~8 = 3, 9+ = 4.
 - 기존 Perfect Clear 보너스는 `perfectClearDamage`로 본다.
 
-Modifier 호환:
+Modifier 사용:
 
-- 기존 `attackMultiplier`는 baseAttack 계열 보너스로 해석한다.
-- 기존 `addAttack`은 `flatBonus`로 해석한다.
+- `attackMultiplier`와 `addAttack`은 legacy 호환용이다. 기존 데이터 지원을 위해 유지하지만 새 유물에는 전용 필드를 우선 사용한다.
+- legacy `attackMultiplier`는 `typeBonus += attackMultiplier - 1`로 해석한다.
+- legacy `addAttack`은 `flatBonus += addAttack`으로 해석한다.
 - 전용 필드는 `comboDamageAdd`, `comboDamageMultiplierAdd`, `b2bDamageAdd`, `b2bDamageMultiplierAdd`, `perfectClearDamageAdd`, `perfectClearDamageMultiplierAdd`, `flatBonusAdd`, `counterBonusAdd`를 사용할 수 있다.
 - Tetris/T-spin처럼 공격 종류 자체를 강화하는 유물은 `attackMultiplier` 대신 `typeBonusAdd`를 사용한다. 예: +25%는 `typeBonusAdd: 0.25`.
+- Danger/Hole/Fast/Garbage/Hold/Rule 리스크 보상처럼 상태 조건에 따른 공격 강화 유물은 `stateBonusAdd`를 사용한다. 예: +25%는 `stateBonusAdd: 0.25`.
+- Combo 피해 증가는 `comboDamageAdd`, B2B 피해 증가는 `b2bDamageAdd` 또는 `b2bDamageMultiplierAdd`, 단순 추가타는 `flatBonusAdd`를 사용한다.
+- TODO: Fast 유물은 기본 `speedBonus`와 `stateBonusAdd`가 중첩되므로 다음 밸런스 단계에서 수치 재검토가 필요하다.
 
 이 문서는 현재 구현된 유물 시스템의 데이터 구조, 적용 흐름, 보상 풀 정책을 정리한다.
 새 유물을 추가하거나 기존 유물을 조정할 때 이 문서를 기준으로 확인한다.
@@ -96,7 +100,9 @@ Modifier 호환:
 공격 modifier는 현재 공격값에 순서대로 적용된다.
 
 ```ts
-current * attackMultiplier + addAttack
+// legacy compatibility only
+typeBonus += attackMultiplier - 1
+flatBonus += addAttack
 ```
 
 공격값은 `EffectResolver`에서 `NaN`, `Infinity`, 음수 피해가 나오지 않도록 정리된다.
@@ -271,7 +277,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.25,
+  typeBonusAdd: 0.25,
   when: { linesCleared: 4 }
 }
 ```
@@ -281,7 +287,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.5,
+  stateBonusAdd: 0.5,
   when: { isDanger: { equals: true } }
 }
 ```
@@ -289,7 +295,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.3,
+  stateBonusAdd: 0.3,
   when: { holdUsedThisBattle: { notEquals: true } }
 }
 ```
@@ -299,7 +305,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  addAttack: 1,
+  comboDamageAdd: 1,
   when: { combo: { gte: 2 } }
 }
 ```
@@ -307,7 +313,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.25,
+  stateBonusAdd: 0.25,
   when: { fieldHeight: { lte: 4 } }
 }
 ```
@@ -317,7 +323,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.25,
+  stateBonusAdd: 0.25,
   when: {
     isDanger: true,
     linesCleared: 4
@@ -330,7 +336,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.25,
+  typeBonusAdd: 0.25,
   whenAny: [
     { linesCleared: 4 },
     { isTSpin: true }
@@ -343,7 +349,7 @@ current * attackMultiplier + addAttack
 ```ts
 {
   trigger: "onAttackCalculated",
-  attackMultiplier: 1.25,
+  stateBonusAdd: 0.25,
   when: { isDanger: true },
   whenAny: [
     { linesCleared: 4 },
@@ -387,7 +393,7 @@ new_attack_relic: {
   modifiers: [
     {
       trigger: "onAttackCalculated",
-      attackMultiplier: 1.25,
+      typeBonusAdd: 0.25,
       when: { linesCleared: 4 },
     },
   ],
@@ -448,7 +454,7 @@ stackable_relic: {
   modifiers: [
     {
       trigger: "onAttackCalculated",
-      addAttack: 1,
+      comboDamageAdd: 1,
       when: { combo: { gte: 2 } },
     },
   ],

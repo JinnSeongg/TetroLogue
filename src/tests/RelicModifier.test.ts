@@ -140,6 +140,42 @@ describe("Relic modifiers", () => {
     });
   });
 
+  it.each([
+    ["danger_power", relicDefinitions.danger_power, { linesCleared: 4, backToBackActive: false, isDanger: true }, 0.5, 15, 30],
+    ["hole_power", relicDefinitions.hole_power, { linesCleared: 4, backToBackActive: false, holeCount: 3 }, 0.25, 13, 28],
+    [
+      "garbage_surge",
+      relicDefinitions.garbage_surge,
+      { linesCleared: 4, backToBackActive: false, pendingGarbageLines: 6 },
+      0.35,
+      14,
+      29,
+    ],
+    [
+      "holdless_focus",
+      relicDefinitions.holdless_focus,
+      { linesCleared: 4, backToBackActive: false, holdUsedThisBattle: false },
+      0.3,
+      13,
+      28,
+    ],
+    ["compressed_preview", relicDefinitions.compressed_preview, { linesCleared: 4, backToBackActive: false }, 0.2, 12, 27],
+    ["fast_strong_attack", relicDefinitions.fast_strong_attack, { linesCleared: 4, backToBackActive: false, fastChain: 3 }, 0.35, 14, 29],
+  ] as const)("applies %s as stateBonusAdd only to baseAttack", (_id, relic, context, expectedStateBonus, expectedBase, expectedFinal) => {
+    const result = new EffectResolver().applyAttackModifiers(createReferenceAttackResult(), [relic], context, {
+      includeDetails: true,
+    });
+
+    expectBucket(result.attackResult, {
+      stateBonus: expectedStateBonus,
+      baseScaledDamage: expectedBase,
+      finalDamage: expectedFinal,
+    });
+    expect(result.attackResult?.comboScaledDamage).toBe(4);
+    expect(result.attackResult?.b2bScaledDamage).toBe(3);
+    expect(result.attackResult?.perfectClearScaledDamage).toBe(5);
+  });
+
   it("clamps final bucket damage to zero", () => {
     const result = new EffectResolver().applyAttackModifiers(
       createAttackResult({ baseAttack: 1 }),
@@ -169,72 +205,72 @@ describe("Relic modifiers", () => {
 
   it("applies danger_power only when danger context is true", () => {
     const resolver = new EffectResolver();
-    const safe = resolver.applyAttackModifiers(4, [relicDefinitions.danger_power], {
+    const safe = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_power], {
       linesCleared: 4,
       backToBackActive: false,
       isDanger: false,
     });
-    const danger = resolver.applyAttackModifiers(4, [relicDefinitions.danger_power], {
+    const danger = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_power], {
       linesCleared: 4,
       backToBackActive: false,
       isDanger: true,
     });
 
-    expect(safe).toBe(4);
-    expect(danger).toBe(6);
+    expect(safe.totalDamage).toBe(4);
+    expect(danger.totalDamage).toBe(6);
   });
 
   it("applies fast_power only when fastChain context reaches 1", () => {
     const resolver = new EffectResolver();
-    const normal = resolver.applyAttackModifiers(4, [relicDefinitions.fast_power], {
+    const normal = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_power], {
       linesCleared: 4,
       backToBackActive: false,
       fastChain: 0,
     });
-    const fast = resolver.applyAttackModifiers(4, [relicDefinitions.fast_power], {
+    const fast = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_power], {
       linesCleared: 4,
       backToBackActive: false,
       fastChain: 1,
     });
 
-    expect(normal).toBe(4);
-    expect(fast).toBe(5);
+    expect(normal.totalDamage).toBe(4);
+    expect(fast.totalDamage).toBe(5);
   });
 
   it("applies compressed_preview as an unconditional attack multiplier", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.compressed_preview], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.compressed_preview], {
       linesCleared: 1,
       backToBackActive: false,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("applies no_hold_focus as an unconditional attack multiplier", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.no_hold_focus], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.no_hold_focus], {
       linesCleared: 1,
       backToBackActive: false,
     });
 
-    expect(result).toBe(6);
+    expect(result.totalDamage).toBe(6);
   });
 
   it("applies forced_speed as an unconditional attack multiplier", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.forced_speed], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.forced_speed], {
       linesCleared: 1,
       backToBackActive: false,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("applies overheated_drop as an unconditional attack multiplier", () => {
-    const result = new EffectResolver().applyAttackModifiers(20, [relicDefinitions.overheated_drop], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 20 }), [relicDefinitions.overheated_drop], {
       linesCleared: 1,
       backToBackActive: false,
     });
 
-    expect(result).toBe(27);
+    expect(result.totalDamage).toBe(27);
   });
 
   it("applies quick_judgement b2b multiplier only for B2B count", () => {
@@ -253,51 +289,71 @@ describe("Relic modifiers", () => {
     expect(active.totalDamage).toBe(9);
   });
 
+  it("applies B2B flat and pressure relics only to B2B damage", () => {
+    const flat = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 2 }), [relicDefinitions.b2b_flat_bonus], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 2,
+    });
+    const pressure = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 4 }), [relicDefinitions.b2b_pressure], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 4,
+    });
+
+    expect(flat.b2bDamage).toBe(3);
+    expect(flat.b2bScaledDamage).toBe(3);
+    expect(flat.totalDamage).toBe(7);
+    expect(pressure.b2bDamage).toBe(4);
+    expect(pressure.b2bScaledDamage).toBe(5);
+    expect(pressure.totalDamage).toBe(9);
+  });
+
   it("applies holdless_focus only before hold is used this battle", () => {
     const resolver = new EffectResolver();
-    const beforeHold = resolver.applyAttackModifiers(4, [relicDefinitions.holdless_focus], {
+    const beforeHold = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.holdless_focus], {
       linesCleared: 4,
       backToBackActive: false,
       holdUsedThisBattle: false,
     });
-    const afterHold = resolver.applyAttackModifiers(4, [relicDefinitions.holdless_focus], {
+    const afterHold = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.holdless_focus], {
       linesCleared: 4,
       backToBackActive: false,
       holdUsedThisBattle: true,
     });
 
-    expect(beforeHold).toBe(5);
-    expect(afterHold).toBe(4);
+    expect(beforeHold.totalDamage).toBe(5);
+    expect(afterHold.totalDamage).toBe(4);
   });
 
   it("applies hole_power when holeCount is at least 3", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.hole_power], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.hole_power], {
       linesCleared: 4,
       backToBackActive: false,
       holeCount: 3,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("applies fast_chain_power when fastChain is at least 3", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.fast_chain_power], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_chain_power], {
       linesCleared: 4,
       backToBackActive: false,
       fastChain: 3,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("applies garbage_absorb when pendingGarbageLines is at least 3", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.garbage_absorb], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.garbage_absorb], {
       linesCleared: 4,
       backToBackActive: false,
       pendingGarbageLines: 3,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("does not apply representative conditional relics when their conditions are not met", () => {
@@ -339,7 +395,7 @@ describe("Relic modifiers", () => {
   });
 
   it("applies mini_spin_bonus for T-spin Mini context", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.mini_spin_bonus], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 1 }), [relicDefinitions.mini_spin_bonus], {
       linesCleared: 1,
       backToBackActive: false,
       isTSpin: true,
@@ -347,7 +403,8 @@ describe("Relic modifiers", () => {
       isTSpinFull: false,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
+    expect(result.flatBonus).toBe(1);
   });
 
   it("applies tsd_tst_power for T-spin Double or Triple", () => {
@@ -383,154 +440,163 @@ describe("Relic modifiers", () => {
   });
 
   it("applies combo_attack when combo is at least 2", () => {
-    const inactive = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_attack], {
+    const inactive = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.combo_attack], {
       linesCleared: 4,
       backToBackActive: false,
       combo: 1,
     });
-    const active = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_attack], {
+    const active = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.combo_attack], {
       linesCleared: 4,
       backToBackActive: false,
       combo: 2,
     });
 
-    expect(inactive).toBe(4);
-    expect(active).toBe(5);
+    expect(inactive.totalDamage).toBe(4);
+    expect(active.totalDamage).toBe(5);
+    expect(active.comboDamage).toBe(1);
   });
 
   it("applies long_combo_flow when combo is at least 9", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.long_combo_flow], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.long_combo_flow], {
       linesCleared: 4,
       backToBackActive: false,
       combo: 9,
     });
 
-    expect(result).toBe(6);
+    expect(result.totalDamage).toBe(6);
+    expect(result.comboDamage).toBe(2);
   });
 
   it("applies new combo relics for threshold, small attack, and low field conditions", () => {
-    const combo4 = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_4_bonus], {
+    const combo4 = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.combo_4_bonus], {
       linesCleared: 2,
       backToBackActive: false,
       combo: 4,
     });
-    const smallCombo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_small_attack_bonus], {
+    const smallCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.combo_small_attack_bonus], {
       linesCleared: 2,
       backToBackActive: false,
       combo: 2,
     });
-    const largeCombo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_small_attack_bonus], {
+    const largeCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.combo_small_attack_bonus], {
       linesCleared: 4,
       backToBackActive: false,
       combo: 2,
     });
-    const lowFieldCombo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.low_field_combo_bonus], {
+    const lowFieldCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.low_field_combo_bonus], {
       linesCleared: 2,
       backToBackActive: false,
       combo: 2,
       fieldHeight: 4,
     });
 
-    expect(combo4).toBe(5);
-    expect(smallCombo).toBe(5);
-    expect(largeCombo).toBe(4);
-    expect(lowFieldCombo).toBe(5);
+    expect(combo4.totalDamage).toBe(5);
+    expect(combo4.comboDamage).toBe(1);
+    expect(smallCombo.totalDamage).toBe(5);
+    expect(smallCombo.flatBonus).toBe(1);
+    expect(largeCombo.totalDamage).toBe(4);
+    expect(lowFieldCombo.totalDamage).toBe(5);
+    expect(lowFieldCombo.comboDamage).toBe(1);
   });
 
   it("applies new danger relics for line clear and combo attacks", () => {
-    const dangerLine = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.danger_line_bonus], {
+    const dangerLine = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_line_bonus], {
       linesCleared: 1,
       backToBackActive: false,
       isDanger: true,
     });
-    const dangerCombo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.danger_combo_power], {
+    const dangerCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_combo_power], {
       linesCleared: 1,
       backToBackActive: false,
       isDanger: true,
       combo: 2,
     });
-    const safeCombo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.danger_combo_power], {
+    const safeCombo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_combo_power], {
       linesCleared: 1,
       backToBackActive: false,
       isDanger: false,
       combo: 2,
     });
 
-    expect(dangerLine).toBe(5);
-    expect(dangerCombo).toBe(5);
-    expect(safeCombo).toBe(4);
+    expect(dangerLine.totalDamage).toBe(5);
+    expect(dangerLine.flatBonus).toBe(1);
+    expect(dangerCombo.totalDamage).toBe(5);
+    expect(dangerCombo.comboDamage).toBe(1);
+    expect(safeCombo.totalDamage).toBe(4);
   });
 
   it("applies hole_tspin_power when holes and T-spin are both present", () => {
-    const noHole = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.hole_tspin_power], {
+    const noHole = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.hole_tspin_power], {
       linesCleared: 2,
       backToBackActive: false,
       holeCount: 0,
       isTSpin: true,
     });
-    const active = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.hole_tspin_power], {
+    const active = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.hole_tspin_power], {
       linesCleared: 2,
       backToBackActive: false,
       holeCount: 1,
       isTSpin: true,
     });
 
-    expect(noHole).toBe(4);
-    expect(active).toBe(5);
+    expect(noHole.totalDamage).toBe(4);
+    expect(active.totalDamage).toBe(5);
   });
 
   it("applies low and clean field attack relics", () => {
-    const lowField = new EffectResolver().applyAttackModifiers(10, [relicDefinitions.low_field_power], {
+    const lowField = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 10 }), [relicDefinitions.low_field_power], {
       linesCleared: 1,
       backToBackActive: false,
       fieldHeight: 4,
     });
-    const cleanField = new EffectResolver().applyAttackModifiers(8, [relicDefinitions.clean_field_power], {
+    const cleanField = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 8 }), [relicDefinitions.clean_field_power], {
       linesCleared: 1,
       backToBackActive: false,
       fieldHeight: 4,
       holeCount: 0,
     });
-    const dirtyField = new EffectResolver().applyAttackModifiers(8, [relicDefinitions.clean_field_power], {
+    const dirtyField = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 8 }), [relicDefinitions.clean_field_power], {
       linesCleared: 1,
       backToBackActive: false,
       fieldHeight: 4,
       holeCount: 1,
     });
 
-    expect(lowField).toBe(12);
-    expect(cleanField).toBe(10);
-    expect(dirtyField).toBe(8);
+    expect(lowField.totalDamage).toBe(12);
+    expect(cleanField.totalDamage).toBe(10);
+    expect(dirtyField.totalDamage).toBe(8);
   });
 
   it("applies new Fast relics for fast line, combo, and T-spin attacks", () => {
-    const strong = new EffectResolver().applyAttackModifiers(20, [relicDefinitions.fast_strong_attack], {
+    const strong = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 20 }), [relicDefinitions.fast_strong_attack], {
       linesCleared: 1,
       backToBackActive: false,
       fastChain: 3,
     });
-    const combo = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.fast_combo_bonus], {
+    const combo = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_combo_bonus], {
       linesCleared: 1,
       backToBackActive: false,
       fastChain: 3,
       combo: 2,
     });
-    const line = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.fast_line_bonus], {
+    const line = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.fast_line_bonus], {
       linesCleared: 1,
       backToBackActive: false,
       fastChain: 3,
     });
-    const tSpin = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.fast_tspin_power], {
+    const tSpin = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.fast_tspin_power], {
       linesCleared: 2,
       backToBackActive: false,
       fastChain: 3,
       isTSpin: true,
     });
 
-    expect(strong).toBe(27);
-    expect(combo).toBe(5);
-    expect(line).toBe(5);
-    expect(tSpin).toBe(5);
+    expect(strong.totalDamage).toBe(27);
+    expect(combo.totalDamage).toBe(5);
+    expect(combo.comboDamage).toBe(1);
+    expect(line.totalDamage).toBe(5);
+    expect(line.flatBonus).toBe(1);
+    expect(tSpin.totalDamage).toBe(5);
   });
 
   it("can use GarbageQueue total amount as pending garbage context", () => {
@@ -543,13 +609,13 @@ describe("Relic modifiers", () => {
   });
 
   it("keeps equals boolean conditions compatible with existing relic definitions", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.danger_power], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.danger_power], {
       linesCleared: 4,
       backToBackActive: false,
       isDanger: true,
     });
 
-    expect(result).toBe(6);
+    expect(result.totalDamage).toBe(6);
   });
 
   it("applies gte number conditions when the context reaches the threshold", () => {
@@ -660,47 +726,48 @@ describe("Relic modifiers", () => {
   });
 
   it("applies high_stack_counter for Danger Tetris", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.high_stack_counter], {
       linesCleared: 4,
       backToBackActive: false,
       isDanger: true,
       isTSpin: false,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("applies high_stack_counter for Danger T-spin", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.high_stack_counter], {
       linesCleared: 2,
       backToBackActive: false,
       isDanger: true,
       isTSpin: true,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
   });
 
   it("does not apply high_stack_counter outside Danger", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.high_stack_counter], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.high_stack_counter], {
       linesCleared: 4,
       backToBackActive: false,
       isDanger: false,
       isTSpin: true,
     });
 
-    expect(result).toBe(4);
+    expect(result.totalDamage).toBe(4);
   });
 
   it("applies combo_attack when comboBonus is at least 1", () => {
-    const result = new EffectResolver().applyAttackModifiers(4, [relicDefinitions.combo_attack], {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.combo_attack], {
       linesCleared: 4,
       backToBackActive: false,
       combo: 0,
       comboBonus: 1,
     });
 
-    expect(result).toBe(5);
+    expect(result.totalDamage).toBe(5);
+    expect(result.comboDamage).toBe(1);
   });
 
   it("fails safely for unknown context keys and invalid numeric comparisons", () => {

@@ -28,7 +28,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Tetris 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("tetris", "common"),
     tags: ["attack", "tetris", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 4 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 4 } }],
   },
   tetris_overwhelm: {
     id: "tetris_overwhelm",
@@ -62,7 +62,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     tags: ["rule", "shop", "next"],
     modifiers: [
       { trigger: "passive", nextPreviewCountAdd: -2 },
-      { trigger: "onAttackCalculated", attackMultiplier: 1.2 },
+      { trigger: "onAttackCalculated", stateBonusAdd: 0.2 },
     ],
   },
   wide_next: {
@@ -89,7 +89,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     tags: ["rule", "shop", "hold"],
     modifiers: [
       { trigger: "passive", holdEnabledOverride: false },
-      { trigger: "onAttackCalculated", attackMultiplier: 1.5 },
+      { trigger: "onAttackCalculated", stateBonusAdd: 0.5 },
     ],
   },
   extra_hold_slot: {
@@ -108,7 +108,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     tags: ["rule", "shop", "gravity", "attack"],
     modifiers: [
       { trigger: "passive", gravityMsMultiplier: 0.75 },
-      { trigger: "onAttackCalculated", attackMultiplier: 1.25 },
+      { trigger: "onAttackCalculated", stateBonusAdd: 0.25 },
     ],
   },
   overheated_drop: {
@@ -119,7 +119,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     tags: ["rule", "shop", "lockDelay", "attack"],
     modifiers: [
       { trigger: "passive", lockDelayMsAdd: -300 },
-      { trigger: "onAttackCalculated", attackMultiplier: 1.35 },
+      { trigger: "onAttackCalculated", stateBonusAdd: 0.35 },
     ],
   },
   quick_judgement: {
@@ -139,7 +139,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Danger 상태에서 공격 피해가 50% 증가합니다.",
     ...combatRelic("danger", "uncommon"),
     tags: ["attack", "danger"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.5, when: { isDanger: true } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.5, when: { isDanger: true } }],
   },
   fast_power: {
     id: "fast_power",
@@ -147,7 +147,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast 상태에서 공격 피해가 25% 증가합니다.",
     ...combatRelic("speed", "common"),
     tags: ["attack", "speed", "fast"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { fastChain: { gte: 1 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { fastChain: { gte: 1 } } }],
   },
   holdless_focus: {
     id: "holdless_focus",
@@ -155,7 +155,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "이번 전투에서 Hold를 아직 사용하지 않았다면 공격 피해가 30% 증가합니다.",
     ...shopRelic("nextHold", "uncommon"),
     tags: ["attack", "shop", "hold"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.3, when: { holdUsedThisBattle: false } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.3, when: { holdUsedThisBattle: false } }],
   },
   b2b_flat_bonus: {
     id: "b2b_flat_bonus",
@@ -195,7 +195,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "T-spin Mini 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("spin", "common"),
     tags: ["attack", "spin", "tSpinMini", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { isTSpinMini: true } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { isTSpinMini: true } }],
   },
   tsd_tst_power: {
     id: "tsd_tst_power",
@@ -211,7 +211,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Combo 2 이상이거나 comboBonus가 1 이상일 때 추가 피해 +1을 더합니다.",
     ...combatRelic("combo", "common"),
     tags: ["attack", "combo", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, whenAny: [{ combo: { gte: 2 } }, { comboBonus: { gte: 1 } }] }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 1, whenAny: [{ combo: { gte: 2 } }, { comboBonus: { gte: 1 } }] }],
   },
   long_combo_flow: {
     id: "long_combo_flow",
@@ -219,7 +219,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Combo 9 이상일 때 추가 피해 +2를 더합니다.",
     ...combatRelic("combo", "rare"),
     tags: ["attack", "combo", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 2, when: { combo: { gte: 9 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 2, when: { combo: { gte: 9 } } }],
   },
   combo_4_bonus: {
     id: "combo_4_bonus",
@@ -227,7 +227,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Combo 4 이상이면 추가 피해 +1을 더합니다.",
     ...combatRelic("combo", "uncommon"),
     tags: ["attack", "combo", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { combo: { gte: 4 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 1, when: { combo: { gte: 4 } } }],
   },
   combo_small_attack_bonus: {
     id: "combo_small_attack_bonus",
@@ -238,7 +238,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     modifiers: [
       {
         trigger: "onAttackCalculated",
-        addAttack: 1,
+        flatBonusAdd: 1,
         when: { combo: { gte: 2 } },
         whenAny: [{ linesCleared: 1 }, { linesCleared: 2 }],
       },
@@ -250,7 +250,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "낮은 필드에서 Combo 공격을 하면 추가 피해 +1을 더합니다.",
     ...combatRelic("combo", "uncommon"),
     tags: ["attack", "combo", "flatBonus", "field"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { combo: { gte: 2 }, fieldHeight: { lte: 4 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 1, when: { combo: { gte: 2 }, fieldHeight: { lte: 4 } } }],
   },
   high_stack_counter: {
     id: "high_stack_counter",
@@ -261,7 +261,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     modifiers: [
       {
         trigger: "onAttackCalculated",
-        attackMultiplier: 1.25,
+        stateBonusAdd: 0.25,
         when: { isDanger: true },
         whenAny: [{ linesCleared: 4 }, { isTSpin: true }],
       },
@@ -273,7 +273,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Danger 상태에서 줄 제거 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("danger", "common"),
     tags: ["attack", "danger", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { isDanger: true, linesCleared: { gte: 1 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { isDanger: true, linesCleared: { gte: 1 } } }],
   },
   danger_combo_power: {
     id: "danger_combo_power",
@@ -281,7 +281,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Danger 상태에서 Combo 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("danger", "uncommon"),
     tags: ["attack", "danger", "combo", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { isDanger: true, combo: { gte: 2 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 1, when: { isDanger: true, combo: { gte: 2 } } }],
   },
   hole_power: {
     id: "hole_power",
@@ -289,7 +289,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "hole이 3개 이상이면 공격 피해가 25% 증가합니다.",
     ...combatRelic("hole", "common"),
     tags: ["attack", "hole"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { holeCount: { gte: 3 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { holeCount: { gte: 3 } } }],
   },
   broken_field_power: {
     id: "broken_field_power",
@@ -297,7 +297,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "hole이 5개 이상이면 공격 피해가 50% 증가합니다.",
     ...combatRelic("hole", "rare"),
     tags: ["attack", "hole"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.5, when: { holeCount: { gte: 5 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.5, when: { holeCount: { gte: 5 } } }],
   },
   hole_tspin_power: {
     id: "hole_tspin_power",
@@ -305,7 +305,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Hole이 있는 상태에서 T-spin 공격 피해가 25% 증가합니다.",
     ...combatRelic("hole", "uncommon"),
     tags: ["attack", "hole", "spin", "tSpin"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { holeCount: { gte: 1 }, isTSpin: true } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { holeCount: { gte: 1 }, isTSpin: true } }],
   },
   low_field_power: {
     id: "low_field_power",
@@ -313,7 +313,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "낮은 필드에서 공격 피해가 20% 증가합니다.",
     ...combatRelic("perfectClear", "uncommon"),
     tags: ["attack", "field"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.2, when: { fieldHeight: { lte: 4 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.2, when: { fieldHeight: { lte: 4 } } }],
   },
   clean_field_power: {
     id: "clean_field_power",
@@ -321,7 +321,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Hole이 없고 낮은 필드라면 공격 피해가 25% 증가합니다.",
     ...combatRelic("perfectClear", "uncommon"),
     tags: ["attack", "field", "hole"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { holeCount: 0, fieldHeight: { lte: 4 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { holeCount: 0, fieldHeight: { lte: 4 } } }],
   },
   fast_chain_power: {
     id: "fast_chain_power",
@@ -329,7 +329,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast Chain이 3 이상이면 공격 피해가 25% 증가합니다.",
     ...combatRelic("speed", "uncommon"),
     tags: ["attack", "speed", "fastChain"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { fastChain: { gte: 3 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { fastChain: { gte: 3 } } }],
   },
   fast_strong_attack: {
     id: "fast_strong_attack",
@@ -337,7 +337,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast 상태에서 공격 피해가 35% 증가합니다.",
     ...combatRelic("speed", "rare"),
     tags: ["attack", "speed", "fast"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.35, when: { fastChain: { gte: 3 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.35, when: { fastChain: { gte: 3 } } }],
   },
   fast_combo_bonus: {
     id: "fast_combo_bonus",
@@ -345,7 +345,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast 상태에서 Combo 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("speed", "uncommon"),
     tags: ["attack", "speed", "fast", "combo", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { fastChain: { gte: 3 }, combo: { gte: 2 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", comboDamageAdd: 1, when: { fastChain: { gte: 3 }, combo: { gte: 2 } } }],
   },
   fast_line_bonus: {
     id: "fast_line_bonus",
@@ -353,7 +353,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast 상태에서 줄 제거 공격에 추가 피해 +1을 더합니다.",
     ...combatRelic("speed", "common"),
     tags: ["attack", "speed", "fast", "flatBonus"],
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { fastChain: { gte: 3 }, linesCleared: { gte: 1 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { fastChain: { gte: 3 }, linesCleared: { gte: 1 } } }],
   },
   fast_tspin_power: {
     id: "fast_tspin_power",
@@ -361,7 +361,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "Fast 상태에서 T-spin 공격 피해가 25% 증가합니다.",
     ...combatRelic("speed", "uncommon"),
     tags: ["attack", "speed", "fast", "spin", "tSpin"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { fastChain: { gte: 3 }, isTSpin: true } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { fastChain: { gte: 3 }, isTSpin: true } }],
   },
   garbage_absorb: {
     id: "garbage_absorb",
@@ -369,7 +369,7 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "대기 garbage가 3줄 이상이면 공격 피해가 25% 증가합니다.",
     ...combatRelic("garbage", "common"),
     tags: ["attack", "garbage"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.25, when: { pendingGarbageLines: { gte: 3 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.25, when: { pendingGarbageLines: { gte: 3 } } }],
   },
   garbage_surge: {
     id: "garbage_surge",
@@ -377,21 +377,21 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     description: "대기 garbage가 6줄 이상이면 공격 피해가 35% 증가합니다.",
     ...combatRelic("garbage", "rare"),
     tags: ["attack", "garbage"],
-    modifiers: [{ trigger: "onAttackCalculated", attackMultiplier: 1.35, when: { pendingGarbageLines: { gte: 6 } } }],
+    modifiers: [{ trigger: "onAttackCalculated", stateBonusAdd: 0.35, when: { pendingGarbageLines: { gte: 6 } } }],
   },
   relic_tetris_power: {
     id: "relic_tetris_power",
     name: "Tetris Power",
     description: "Tetris attacks gain +2 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 2, when: { linesCleared: 4 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 2, when: { linesCleared: 4 } }],
   },
   relic_single_line_chip: {
     id: "relic_single_line_chip",
     name: "Single Line Chip",
     description: "Single-line clears gain +1 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 1 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 1 } }],
   },
   relic_b2b_focus: {
     id: "relic_b2b_focus",
@@ -405,35 +405,35 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     name: "Double Blade",
     description: "Double clears gain +1 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 2 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 2 } }],
   },
   relic_triple_lance: {
     id: "relic_triple_lance",
     name: "Triple Lance",
     description: "Triple clears gain +2 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 2, when: { linesCleared: 3 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 2, when: { linesCleared: 3 } }],
   },
   relic_clean_four: {
     id: "relic_clean_four",
     name: "Clean Four",
     description: "Tetris attacks gain another +1 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 4 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 4 } }],
   },
   relic_chip_engine: {
     id: "relic_chip_engine",
     name: "Chip Engine",
     description: "Single-line clears gain another +1 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 1 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 1 } }],
   },
   relic_guard_breaker: {
     id: "relic_guard_breaker",
     name: "Guard Breaker",
     description: "Double clears gain +2 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 2, when: { linesCleared: 2 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 2, when: { linesCleared: 2 } }],
   },
   relic_b2b_reactor: {
     id: "relic_b2b_reactor",
@@ -447,21 +447,21 @@ export const relicDefinitions: Record<string, RelicDefinition> = {
     name: "Column Prism",
     description: "Triple clears gain +1 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 3 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 3 } }],
   },
   relic_quadra_core: {
     id: "relic_quadra_core",
     name: "Quadra Core",
     description: "Tetris attacks gain +3 damage.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 3, when: { linesCleared: 4 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 3, when: { linesCleared: 4 } }],
   },
   relic_line_spark: {
     id: "relic_line_spark",
     name: "Line Spark",
     description: "Any single-line clear becomes a little more useful.",
     ...disabledLegacyRelic,
-    modifiers: [{ trigger: "onAttackCalculated", addAttack: 1, when: { linesCleared: 1 } }],
+    modifiers: [{ trigger: "onAttackCalculated", flatBonusAdd: 1, when: { linesCleared: 1 } }],
   },
   relic_twin_hold: {
     id: "relic_twin_hold",
