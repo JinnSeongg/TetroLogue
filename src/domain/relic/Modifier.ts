@@ -9,6 +9,7 @@ export type ModifierContext = {
   isFast?: boolean;
   fastChain?: number;
   holeCount?: number;
+  clearedHoleCount?: number;
   deepHoleCount?: number;
   isTSpin?: boolean;
   isTSpinMini?: boolean;

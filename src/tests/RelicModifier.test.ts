@@ -252,6 +252,71 @@ describe("Relic modifiers", () => {
     expect(comboActive.totalDamage).toBe(8);
   });
 
+  it("applies small line relics only to normal line clears and not T-spins", () => {
+    const resolver = new EffectResolver();
+    const single = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 1 }), [relicDefinitions.small_line_bonus], {
+      linesCleared: 1,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const double = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.double_line_bonus], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const tSpinDouble = resolver.applyAttackModifiers(
+      createAttackResult({ baseAttack: 4, linesCleared: 2 }),
+      [relicDefinitions.small_line_bonus, relicDefinitions.double_line_bonus],
+      {
+        linesCleared: 2,
+        backToBackActive: false,
+        isTSpin: true,
+      },
+    );
+
+    expect(single.flatBonus).toBe(1);
+    expect(single.totalDamage).toBe(5);
+    expect(double.flatBonus).toBe(1);
+    expect(double.totalDamage).toBe(5);
+    expect(tSpinDouble.flatBonus).toBe(0);
+    expect(tSpinDouble.totalDamage).toBe(4);
+  });
+
+  it("applies line clear tradeoff relics to the intended buckets", () => {
+    const resolver = new EffectResolver();
+    const tetrisPenalty = resolver.applyAttackModifiers(
+      createAttackResult({ baseAttack: 10, linesCleared: 4 }),
+      [relicDefinitions.small_line_tetris_tradeoff],
+      { linesCleared: 4, backToBackActive: false, isTSpin: false },
+    );
+    const tSpinPenalty = resolver.applyAttackModifiers(
+      createAttackResult({ baseAttack: 10, linesCleared: 2 }),
+      [relicDefinitions.small_line_tspin_tradeoff],
+      { linesCleared: 2, backToBackActive: false, isTSpin: true },
+    );
+    const basicTriple = resolver.applyAttackModifiers(
+      createAttackResult({ baseAttack: 4, linesCleared: 3 }),
+      [relicDefinitions.basic_line_clear_focus],
+      { linesCleared: 3, backToBackActive: false, isTSpin: false },
+    );
+    const basicTSpinPenalty = resolver.applyAttackModifiers(
+      createAttackResult({ baseAttack: 10, linesCleared: 1 }),
+      [relicDefinitions.basic_line_clear_focus],
+      { linesCleared: 1, backToBackActive: false, isTSpin: true },
+    );
+
+    expect(tetrisPenalty.typeBonus).toBe(-0.2);
+    expect(tetrisPenalty.totalDamage).toBe(8);
+    expect(tSpinPenalty.typeBonus).toBe(-0.2);
+    expect(tSpinPenalty.flatBonus).toBe(0);
+    expect(tSpinPenalty.totalDamage).toBe(8);
+    expect(basicTriple.flatBonus).toBe(1);
+    expect(basicTriple.totalDamage).toBe(5);
+    expect(basicTSpinPenalty.typeBonus).toBe(-0.3);
+    expect(basicTSpinPenalty.flatBonus).toBe(0);
+    expect(basicTSpinPenalty.totalDamage).toBe(7);
+  });
+
   it("applies new T-spin type relics only for their conditions", () => {
     const powerInactive = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 10, linesCleared: 2 }), [relicDefinitions.tspin_power_2], {
       linesCleared: 2,
@@ -496,6 +561,55 @@ describe("Relic modifiers", () => {
     expect(result.totalDamage).toBe(11);
   });
 
+  it("applies next_down_flat_bonus as a final flat bonus for every attack", () => {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, comboDamage: 2 }), [relicDefinitions.next_down_flat_bonus], {
+      linesCleared: 4,
+      backToBackActive: false,
+    });
+
+    expect(result.baseScaledDamage).toBe(4);
+    expect(result.comboScaledDamage).toBe(2);
+    expect(result.flatBonus).toBe(1);
+    expect(result.totalDamage).toBe(7);
+  });
+
+  it("applies next_down_small_line_bonus only to normal Single and Double attacks", () => {
+    const resolver = new EffectResolver();
+    const single = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 1 }), [relicDefinitions.next_down_small_line_bonus], {
+      attackKind: "LineClear",
+      linesCleared: 1,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const double = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 2, linesCleared: 2 }), [relicDefinitions.next_down_small_line_bonus], {
+      attackKind: "LineClear",
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const tetris = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.next_down_small_line_bonus], {
+      attackKind: "LineClear",
+      linesCleared: 4,
+      backToBackActive: false,
+      isTSpin: false,
+    });
+    const tSpinDouble = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.next_down_small_line_bonus], {
+      attackKind: "TSpin",
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: true,
+    });
+
+    expect(single.flatBonus).toBe(1);
+    expect(single.totalDamage).toBe(2);
+    expect(double.flatBonus).toBe(1);
+    expect(double.totalDamage).toBe(3);
+    expect(tetris.flatBonus).toBe(0);
+    expect(tetris.totalDamage).toBe(4);
+    expect(tSpinDouble.flatBonus).toBe(0);
+    expect(tSpinDouble.totalDamage).toBe(4);
+  });
+
   it("applies no_hold_focus as Hold abandon flat damage", () => {
     const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.no_hold_focus], {
       linesCleared: 1,
@@ -559,6 +673,22 @@ describe("Relic modifiers", () => {
     expect(pressure.b2bDamageMultiplier).toBe(1.1);
     expect(pressure.b2bScaledDamage).toBe(11);
     expect(pressure.totalDamage).toBe(15);
+  });
+
+  it("applies b2b_power_2 only to the B2B bucket", () => {
+    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 10 }), [relicDefinitions.b2b_power_2], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 1,
+    });
+
+    expect(result.baseScaledDamage).toBe(4);
+    expect(result.b2bDamage).toBe(10);
+    expect(result.b2bDamageMultiplier).toBe(1.2);
+    expect(result.b2bScaledDamage).toBe(12);
+    expect(result.comboScaledDamage).toBe(0);
+    expect(result.perfectClearScaledDamage).toBe(0);
+    expect(result.totalDamage).toBe(16);
   });
 
   it("applies holdless_focus only before hold is used this battle", () => {
@@ -688,6 +818,39 @@ describe("Relic modifiers", () => {
 
     expect(inactive.totalDamage).toBe(24);
     expect(active.totalDamage).toBe(43);
+  });
+
+  it("applies b2b_under_10_power only when B2B count is 1 through 10", () => {
+    const resolver = new EffectResolver();
+    const inactiveZero = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 10 }), [relicDefinitions.b2b_under_10_power], {
+      linesCleared: 4,
+      backToBackActive: false,
+      b2bCount: 0,
+    });
+    const activeOne = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 10 }), [relicDefinitions.b2b_under_10_power], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 1,
+    });
+    const activeTen = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 10 }), [relicDefinitions.b2b_under_10_power], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 10,
+    });
+    const inactiveEleven = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, b2bDamage: 10 }), [relicDefinitions.b2b_under_10_power], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 11,
+    });
+
+    expect(inactiveZero.b2bDamageMultiplier).toBe(1);
+    expect(inactiveZero.totalDamage).toBe(14);
+    expect(activeOne.b2bDamageMultiplier).toBe(1.2);
+    expect(activeOne.totalDamage).toBe(16);
+    expect(activeTen.b2bDamageMultiplier).toBe(1.2);
+    expect(activeTen.totalDamage).toBe(16);
+    expect(inactiveEleven.b2bDamageMultiplier).toBe(1);
+    expect(inactiveEleven.totalDamage).toBe(14);
   });
 
   it("applies combo_attack when combo is at least 2", () => {
@@ -1026,6 +1189,7 @@ describe("Relic modifiers", () => {
     ["hasNextPieceI", { hasNextPieceI: true }],
     ["usedPieceType", { usedPieceType: "T" }],
     ["isBoss", { isBoss: true }],
+    ["clearedHoleCount", { clearedHoleCount: { gte: 1 } }],
   ] as const)("can use %s in modifier conditions", (_name, when) => {
     const relic: RelicDefinition = {
       id: `context_${_name}`,
@@ -1045,6 +1209,7 @@ describe("Relic modifiers", () => {
       hasNextPieceI: true,
       usedPieceType: "T",
       isBoss: true,
+      clearedHoleCount: 1,
     });
     const inactive = new EffectResolver().applyAttackModifiers(4, [relic], {
       linesCleared: 4,
@@ -1056,6 +1221,7 @@ describe("Relic modifiers", () => {
       hasNextPieceI: false,
       usedPieceType: "I",
       isBoss: false,
+      clearedHoleCount: 0,
     });
 
     expect(active).toBe(5);

@@ -9,6 +9,7 @@ import { createClearResult, type ClearResult } from "./ClearResult";
 
 export type LockResult = {
   board: Board;
+  boardBeforeLineClear: Board;
   linesCleared: number;
   clearedRows: number[];
   spinResult: SpinResult;
@@ -39,6 +40,6 @@ export class LockSystem {
       spinResult,
       isPerfectClear,
     });
-    return { ...lineClearResult, spinResult, clearResult, attackResult };
+    return { ...lineClearResult, boardBeforeLineClear: placed, spinResult, clearResult, attackResult };
   }
 }

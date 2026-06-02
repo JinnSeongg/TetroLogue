@@ -72,6 +72,15 @@ timedBuff:
 - `remainingMs <= 0`이 되면 제거된다.
 - 같은 `sourceRelicId` timed buff가 다시 생성되면 중복 누적하지 않고 duration을 갱신한다.
 
+clearedHoleCount:
+
+- 계산 위치는 line clear 직후 공격 `ModifierContext`를 구성하는 `ResolveLineClearUseCase`이다.
+- line clear 전 보드는 `LockSystem`에서 piece를 배치한 뒤 full line을 제거하기 전의 `boardBeforeLineClear`이다.
+- line clear 전 보드 분석값의 `holeCount`를 `beforeHoleCount`, line clear 후 보드 분석값의 `holeCount`를 `afterHoleCount`로 본다.
+- `clearedHoleCount = Math.max(0, beforeHoleCount - afterHoleCount)`이다.
+- hole이 줄어들지 않았거나 line clear가 없는 lock이면 `0`이다.
+- 이 값은 실제 지워진 hole cell 수가 아니라 line clear 전후 `holeCount` 감소량이다.
+
 Combo/Perfect Clear:
 
 - ComboTable 구간형 값은 `comboDamage`로 본다: 0~1 = 0, 2~3 = 1, 4~5 = 2, 6~8 = 3, 9+ = 4.
@@ -204,14 +213,19 @@ flatBonus += addAttack
 | Hold 미사용 공격 강화 | `holdless_focus` disabled | Hold 포기로 통합 |
 | B2B 공격 강화 1 | `b2b_pressure` | B2B 피해 +10% (`b2bDamageMultiplierAdd: 0.1`) |
 | B2B 유지 강화 | `b2b_maintain_power` | `b2bCount >= 10`일 때 B2B 피해 +15% |
+| B2B 공격 강화 2 | `b2b_power_2` | B2B 피해 +20% (`b2bDamageMultiplierAdd: 0.2`) |
+| B2B 10회 이하 강화 | `b2b_under_10_power` | `b2bCount` 1~10일 때 B2B 피해 +20% |
 | 콤보 보너스 증가 | `combo_attack` | `combo >= 2` 조건으로 단순화 |
 | 낮은 콤보 추가타 | `low_combo_bonus` | Combo 2~5 구간에서 `comboDamageAdd: 1` |
 | Fast 효율 증가 | `fast_power`, `fast_tspin_power`, `fast_efficiency_3` | 각각 `speedBonusPerStackAdd: 0.005` |
 | Fast 상한 증가 | `fast_chain_power`, `fast_combo_bonus`, `fast_line_bonus` | 각각 `speedBonusCapAdd: 10` |
 | Fast 고속 추가타 | `fast_strong_attack` | Fast Chain 20 이상 `flatBonusAdd: 1` |
 | Next 감소 공격 강화 | `compressed_preview` | Next -2, 공격 피해 +10% |
+| Next 감소 추가타 | `next_down_flat_bonus` | Next -1, 모든 공격 `flatBonusAdd: 1` |
+| Next 감소 잔줄 추가타 | `next_down_small_line_bonus` | Next -1, 일반 Single/Double `flatBonusAdd: 1` |
 | 빠른 낙하 공격 강화 | `forced_speed` | gravity x0.75, 공격 피해 +10% |
 | 빠른 고정 공격 강화 | `overheated_drop` | lock delay -300ms, 공격 피해 +20% |
+| 안정/초보자/잔줄형 | `stable_lock_delay`, `stable_gravity_lock`, `small_line_bonus`, `double_line_bonus`, `small_line_tetris_tradeoff`, `small_line_tspin_tradeoff`, `basic_line_clear_focus` | 기존 modifier 버킷으로 신규 구현 |
 
 ### 전투 보상 유물
 
@@ -235,6 +249,8 @@ flatBonus += addAttack
 | `b2b_flat_bonus` | B2B 추가타 | `b2b` | `common` | B2B 공격에 추가 피해 +1 | 구현 |
 | `b2b_pressure` | B2B 공격 강화 1 | `b2b` | `uncommon` | B2B 공격 피해 +10% | 구현 |
 | `b2b_maintain_power` | B2B 유지 강화 | `b2b` | `uncommon` | B2B 스택 10 이상이면 B2B 공격 피해 +15% | 구현 |
+| `b2b_power_2` | B2B 공격 강화 2 | `b2b` | `rare` | B2B 공격 피해 +20% | 구현 |
+| `b2b_under_10_power` | B2B 10회 이하 강화 | `b2b` | `uncommon` | B2B 스택 1~10이면 B2B 공격 피해 +20% | 구현 |
 | `b2b_multiple_3_power` | B2B 3배수 강화 | `b2b` | `uncommon` | B2B 카운트 3의 배수 공격 기본 피해 +30% | 신규 구현 |
 | `b2b_multiple_10_bonus` | B2B 10배수 추가타 | `b2b` | `rare` | B2B 카운트 10의 배수이면 B2B 피해 +10 | 신규 구현 |
 | `combo_attack` | 콤보 보너스 증가 | `combo` | `common` | Combo 2 이상이면 comboDamage +1 | 구현 |
@@ -243,9 +259,19 @@ flatBonus += addAttack
 | `combo_4_bonus` | 4콤보 추가 보너스 | `combo` | `uncommon` | Combo 4 이상 추가 피해 +1 | 구현 |
 | `combo_small_attack_bonus` | 콤보 중 소공격 추가타 | `combo` | `common` | Combo 중 Single 또는 Double 추가 피해 +1 | 구현 |
 | `low_field_combo_bonus` | 낮은 필드 콤보 보너스 | `combo` | `uncommon` | 낮은 필드 Combo 추가 피해 +1 | 구현 |
+| `stable_lock_delay` | 안정 Lock Delay 증가 | `rule` | `common` | Lock Delay +150ms | 신규 구현 |
+| `stable_gravity_lock` | 안정 Gravity Lock 증가 | `rule` | `uncommon` | gravity 간격 +15%, lock delay +100ms | 신규 구현 |
+| `small_line_bonus` | 잔줄 추가타 | `combo` | `common` | 일반 Single/Double 추가 피해 +1 | 신규 구현 |
+| `double_line_bonus` | Double 추가타 | `combo` | `common` | 일반 Double 추가 피해 +1 | 신규 구현 |
+| `small_line_tetris_tradeoff` | 잔줄 강화 Tetris 약화 | `combo` | `uncommon` | 일반 Single/Double +1, Tetris 피해 -20% | 신규 구현 |
+| `small_line_tspin_tradeoff` | 잔줄 강화 T-spin 약화 | `combo` | `uncommon` | 일반 Single/Double +1, T-spin 피해 -20% | 신규 구현 |
+| `basic_line_clear_focus` | 기본 줄제거 강화 | `combo` | `rare` | 일반 Single/Double/Triple +1, T-spin 피해 -30% | 신규 구현 |
 | `hole_power` | Hole 보유 공격 강화 | `hole` | `common` | hole 3개 이상 공격 피해 +25% | 기존 유지 |
 | `broken_field_power` | Hole 다수 공격 강화 | `hole` | `rare` | hole 5개 이상 공격 피해 +50% | 기존 유지 |
 | `hole_tspin_power` | Hole T-spin 강화 | `hole` | `uncommon` | Hole 보유 상태 T-spin 공격 피해 +25% | 기존 유지 |
+| `hole_clear_damage` | Hole 제거 피해 | `hole` | `common` | Hole 제거 시 추가 피해 +1 | 신규 구현 |
+| `hole_clear_followup` | Hole 정리 후속 추가타 | `hole` | `uncommon` | Hole 제거 후 다음 공격 추가 피해 +1 | 신규 구현 |
+| `boss_hole_clear_bonus` | 보스 Hole 제거 추가타 | `hole` | `uncommon` | 보스전 Hole 제거 시 추가 피해 +1 | 신규 구현 |
 | `low_field_power` | 낮은 필드 공격 강화 | `perfectClear` | `uncommon` | 낮은 필드 공격 피해 +20% | 기존 유지 |
 | `clean_field_power` | 안정 필드 공격 강화 | `perfectClear` | `uncommon` | Hole이 없고 낮은 필드면 공격 피해 +25% | 기존 유지 |
 | `perfect_clear_flat_1` | Perfect Clear 추가타 1 | `perfectClear` | `common` | Perfect Clear 피해 +3 | 신규 구현 |
@@ -276,6 +302,8 @@ flatBonus += addAttack
 | `delayed_lock` | Lock Delay 증가 | `rule` | `common` | lock delay +200ms | 구현 |
 | `instant_soft_drop` | 소프트드랍 즉시 낙하 | `rule` | `rare` | Soft Drop 입력 순간 ghost 위치까지 이동, 즉시 lock 아님 | 구현 |
 | `compressed_preview` | Next 감소 공격 강화 | `rule` | `uncommon` | Next preview -2, 공격 피해 +10% | 구현 |
+| `next_down_flat_bonus` | Next 감소 추가타 | `nextHold` | `uncommon` | Next preview -1, 모든 공격 추가 피해 +1 | 구현 |
+| `next_down_small_line_bonus` | Next 감소 잔줄 추가타 | `nextHold` | `uncommon` | Next preview -1, 일반 Single/Double 추가 피해 +1 | 구현 |
 | `wide_next` | Next +1 | `nextHold` | `common` | Next preview +1 | 구현 |
 | `deep_next` | Next +2 | `nextHold` | `rare` | Next preview +2 | 구현 |
 | `no_hold_focus` | Hold 포기 | `rule` | `rare` | Hold 비활성화, 모든 공격 추가 피해 +2 | 통합 구현 |
@@ -304,7 +332,7 @@ flatBonus += addAttack
 
 ## 최신 유물 기획 확정안
 
-표 공통 열은 `이름 / 최신 효과 / 획득처 / 처리 상태 / 구현 버킷 또는 필요 기반`이다. 처리 상태는 `유지`, `확정`, `개편 예정`, `신규 예정`, `보류`, `임시 비활성화 예정`, `통합 예정`, `폐기`, `미구현`, `추가 예정`을 사용한다.
+표 공통 열은 `이름 / 최신 효과 / 획득처 / 처리 상태 / 구현 버킷 또는 필요 기반`이다. 처리 상태는 `구현`, `통합 구현`, `유지`, `확정`, `개편 예정`, `신규 예정`, `보류`, `임시 비활성화 예정`, `통합 예정`, `폐기`, `미구현`, `추가 예정`을 사용한다.
 
 ### 1. 테트리스형
 
@@ -355,12 +383,12 @@ flatBonus += addAttack
 | 이름 | 최신 효과 | 획득처 | 처리 상태 | 구현 버킷 / 필요 기반 |
 | --- | --- | --- | --- | --- |
 | B2B 추가타 | B2B 공격 추가 피해 +1 | 전투 보상 | 유지 | b2bDamageAdd |
-| B2B 공격 강화 1 | B2B 피해 +10% | 전투 보상 | 개편 예정 | b2bDamageMultiplierAdd +0.1 |
-| B2B 공격 강화 2 | B2B 피해 +20% | 전투 보상 | 신규 예정 / 누적 강화 대체 | b2bDamageMultiplierAdd +0.2 |
-| B2B 10회 이하 강화 | b2bCount <= 10일 때 B2B 피해 +20% | 전투 보상 | 신규 예정 / 3회 강화 대체 | b2bDamageMultiplierAdd +0.2, b2bCount |
+| B2B 공격 강화 1 | B2B 피해 +10% | 전투 보상 | 구현 | b2bDamageMultiplierAdd +0.1 |
+| B2B 공격 강화 2 | B2B 피해 +20% | 전투 보상 | 구현 | b2bDamageMultiplierAdd +0.2 |
+| B2B 10회 이하 강화 | b2bCount <= 10일 때 B2B 피해 +20% | 전투 보상 | 구현 | b2bDamageMultiplierAdd +0.2, b2bCount |
 | B2B 3배수 강화 | b2bCount가 3의 배수일 때 base 피해 +30% | 전투 보상 | 구현 | stateBonusAdd, isB2BMultipleOf3 |
 | B2B 10배수 추가타 | b2bCount가 10의 배수이면 B2B 추가 피해 +10 | 전투 보상 | 구현 | b2bDamageAdd, isB2BMultipleOf10 |
-| B2B 유지 강화 | b2bCount >= 10일 때 B2B 피해 +15% | 전투 보상 | 개편 예정 | b2bDamageMultiplierAdd +0.15 |
+| B2B 유지 강화 | b2bCount >= 10일 때 B2B 피해 +15% | 전투 보상 | 구현 | b2bDamageMultiplierAdd +0.15 |
 | B2B 끊김 방지 | B2B 끊김 1회 방지 | 전투 보상 | 보류 | B2B break hook 필요 |
 | B2B 상쇄 보너스 | B2B 공격으로 garbage 상쇄 시 보너스 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
 | 보스 B2B 강화 | 보스전 B2B 피해 +20% | 전투 보상 | 구현 | b2bDamageMultiplierAdd, isBoss |
@@ -371,11 +399,11 @@ flatBonus += addAttack
 
 | 이름 | 최신 효과 | 획득처 | 처리 상태 | 구현 버킷 / 필요 기반 |
 | --- | --- | --- | --- | --- |
-| 콤보 보너스 증가 | Combo 2 이상이면 추가 피해 +1 | 전투 보상 | 개편 예정 | comboDamageAdd |
+| 콤보 보너스 증가 | Combo 2 이상이면 추가 피해 +1 | 전투 보상 | 구현 | comboDamageAdd |
 | 4콤보 추가 보너스 | Combo 4 이상이면 추가 피해 +1 | 전투 보상 | 유지 | comboDamageAdd |
 | 9콤보 보너스 증가 | Combo 9 이상이면 추가 피해 +2 | 전투 보상 | 유지 | comboDamageAdd |
 | 콤보 중 소공격 추가타 | Combo 중 Single/Double 공격 추가 피해 +1 | 전투 보상 | 유지 | flatBonusAdd 또는 comboDamageAdd |
-| 낮은 콤보 추가타 | Combo 2~5 구간에서 추가 피해 +1 | 전투 보상 | 신규 예정 / 3연속 줄제거 추가타 대체 | comboDamageAdd |
+| 낮은 콤보 추가타 | Combo 2~5 구간에서 추가 피해 +1 | 전투 보상 | 구현 | comboDamageAdd |
 | 낮은 필드 콤보 보너스 | 낮은 필드에서 Combo 공격 추가 피해 +1 | 전투 보상 | 유지 / 재검토 | comboDamageAdd |
 | Garbage 콤보 보너스 | 큐 쓰레기 1줄 제거마다 추가 피해 +1 | 전투 보상 | 보류 | garbage형 임시 비활성화 정책상 보류, canceledGarbageLines 필요 |
 | 콤보 끊김 방지 | Combo 끊김 1회 방지 | 전투 보상 | 보류 | combo break hook 필요 |
@@ -412,12 +440,12 @@ flatBonus += addAttack
 | Hole 잔줄 추가타 2 | hole 5개 이상일 때 Single/Double 피해 +2 | 전투 보상 | 개편 예정 | flatBonusAdd, holeCount |
 | Hole 낙하 완화 | hole 1개 이상이면 gravity 간격 +10% | 전투 보상 | 신규 예정 | 조건부 RuleSet 필요 |
 | Deep Hole 낙하 완화 | Deep Hole 존재 시 gravity 간격 +20% | 전투 보상 | 보류 | deepHoleCount 실제 계산 필요 |
-| Hole 제거 피해 | Hole 제거 시 1 피해 | 전투 보상 | 보류 | clearedHoleCount 필요 |
-| Hole 정리 후속 추가타 | Hole 정리 후 다음 공격 +1 피해 | 전투 보상 | 보류 | nextAttackBuff, clearedHoleCount 필요 |
+| Hole 제거 피해 | Hole 제거 시 1 피해 | 전투 보상 | 구현 | clearedHoleCount |
+| Hole 정리 후속 추가타 | Hole 정리 후 다음 공격 +1 피해 | 전투 보상 | 구현 | nextAttackBuff, clearedHoleCount |
 | Hole 낙하 완화 2 | hole 10개 이상이면 gravity 간격 +30% | 전투 보상 | 신규 예정 / Hole 2개 이상 제거 추가타 대체 | 조건부 RuleSet 필요 |
 | Hole 상쇄 보너스 | Hole을 지우면 큐 대기 garbage 1줄 추가 제거 | 전투 보상 | 보류 | clearedHoleCount, queue cancel hook 필요 |
 | Hole Lock Delay 증가 | hole 3개 이상 존재 시 lock delay +100ms | 전투 보상 | 신규 예정 | 조건부 RuleSet 필요 |
-| 보스 Hole 제거 추가타 | 보스전 Hole 제거 시 +1 피해 | 전투 보상 | 보류 | isBoss, clearedHoleCount 필요 |
+| 보스 Hole 제거 추가타 | 보스전 Hole 제거 시 +1 피해 | 전투 보상 | 구현 | isBoss, clearedHoleCount |
 
 ---
 
@@ -442,14 +470,14 @@ flatBonus += addAttack
 
 | 이름 | 최신 효과 | 획득처 | 처리 상태 | 구현 버킷 / 필요 기반 |
 | --- | --- | --- | --- | --- |
-| Fast 효율 증가 1 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 개편 예정 | speedBonusPerStackAdd +0.005 |
-| Fast 효율 증가 2 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 신규 예정 / Fast T-spin 강화 대체 | speedBonusPerStackAdd +0.005 |
-| Fast 효율 증가 3 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 신규 예정 / Fast 고위험 강화 대체 | speedBonusPerStackAdd +0.005 |
+| Fast 효율 증가 1 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 구현 | speedBonusPerStackAdd +0.005 |
+| Fast 효율 증가 2 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 구현 / Fast T-spin 강화 대체 | speedBonusPerStackAdd +0.005 |
+| Fast 효율 증가 3 | Fast Chain 1당 보너스 +0.5%p | 전투 보상 | 구현 / Fast 고위험 강화 대체 | speedBonusPerStackAdd +0.005 |
 | 보스 Fast 효율 증가 | 보스전 Fast Chain 1당 보너스 +1%p | 전투 보상 | 보류 | 조건부 passive 미지원 |
-| Fast 상한 증가 1 | Fast Chain 보너스 상한 +10 | 전투 보상 | 개편 예정 | speedBonusCapAdd +10 |
-| Fast 상한 증가 2 | Fast Chain 보너스 상한 +10 | 전투 보상 | 신규 예정 / Fast 콤보 보너스 대체 | speedBonusCapAdd +10 |
-| Fast 상한 증가 3 | Fast Chain 보너스 상한 +10 | 전투 보상 | 신규 예정 / Fast 줄제거 추가타 대체 | speedBonusCapAdd +10 |
-| Fast 고속 추가타 | Fast Chain 20 이상이면 추가 피해 +1 | 전투 보상 | 개편 예정 | flatBonusAdd |
+| Fast 상한 증가 1 | Fast Chain 보너스 상한 +10 | 전투 보상 | 구현 | speedBonusCapAdd +10 |
+| Fast 상한 증가 2 | Fast Chain 보너스 상한 +10 | 전투 보상 | 구현 / Fast 콤보 보너스 대체 | speedBonusCapAdd +10 |
+| Fast 상한 증가 3 | Fast Chain 보너스 상한 +10 | 전투 보상 | 구현 / Fast 줄제거 추가타 대체 | speedBonusCapAdd +10 |
+| Fast 고속 추가타 | Fast Chain 20 이상이면 추가 피해 +1 | 전투 보상 | 구현 | flatBonusAdd |
 | Fast 상쇄 보너스 | 공격 시 쓰레기줄 상쇄 +1 | 전투 보상 | 보류 / Hard Drop 추가타 대체 | garbage cancel bonus 필요 |
 | Fast 종료 피해 | Fast가 끊긴 시점의 스택 수 // 10 만큼 피해 | 전투 보상 | 보류 | fast break event 필요 |
 
@@ -478,16 +506,16 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 
 | 이름 | 최신 효과 | 획득처 | 처리 상태 | 구현 버킷 / 필요 기반 |
 | --- | --- | --- | --- | --- |
-| 안정 Lock Delay 증가 | lock delay +150ms | 전투 보상 | 추가 예정 | lockDelayMsAdd |
-| 안정 Gravity Lock 증가 | gravity 간격 +15%, lock delay +100ms | 전투 보상 | 추가 예정 | gravityMsMultiplier, lockDelayMsAdd |
-| Next 감소 추가타 | Next -1, 모든 공격 추가 피해 +1 | 상점 | 추가 예정 | nextPreviewCountAdd, flatBonusAdd |
-| Next 감소 잔줄 추가타 | Next -1, Single/Double 추가 피해 +1 | 상점 | 추가 예정 | nextPreviewCountAdd, flatBonusAdd |
-| Hold 포기 | Hold 비활성화, 모든 공격 추가 피해 +2 | 상점 | 통합 예정 | holdEnabledOverride, flatBonusAdd |
-| 잔줄 추가타 | Single/Double 추가 피해 +1 | 전투 보상 | 추가 예정 | flatBonusAdd |
-| Double 추가타 | Double 추가 피해 +1 | 전투 보상 | 추가 예정 | flatBonusAdd |
-| 잔줄 강화 Tetris 약화 | Single/Double +1, Tetris 피해 -20% | 전투 보상 | 추가 예정 | flatBonusAdd, typeBonusAdd -0.2 |
-| 잔줄 강화 T-spin 약화 | Single/Double +1, T-spin 피해 -20% | 전투 보상 | 추가 예정 | flatBonusAdd, typeBonusAdd -0.2 |
-| 기본 줄제거 강화 | Single/Double/Triple +1, T-spin 피해 -30% | 전투 보상 | 추가 예정 | flatBonusAdd, typeBonusAdd -0.3 |
+| 안정 Lock Delay 증가 | lock delay +150ms | 전투 보상 | 구현 | lockDelayMsAdd |
+| 안정 Gravity Lock 증가 | gravity 간격 +15%, lock delay +100ms | 전투 보상 | 구현 | gravityMsMultiplier, lockDelayMsAdd |
+| Next 감소 추가타 | Next -1, 모든 공격 추가 피해 +1 | 상점 | 구현 | nextPreviewCountAdd, flatBonusAdd |
+| Next 감소 잔줄 추가타 | Next -1, Single/Double 추가 피해 +1 | 상점 | 구현 | nextPreviewCountAdd, flatBonusAdd |
+| Hold 포기 | Hold 비활성화, 모든 공격 추가 피해 +2 | 상점 | 통합 구현 | holdEnabledOverride, flatBonusAdd |
+| 잔줄 추가타 | Single/Double 추가 피해 +1 | 전투 보상 | 구현 | flatBonusAdd |
+| Double 추가타 | Double 추가 피해 +1 | 전투 보상 | 구현 | flatBonusAdd |
+| 잔줄 강화 Tetris 약화 | Single/Double +1, Tetris 피해 -20% | 전투 보상 | 구현 | flatBonusAdd, typeBonusAdd -0.2 |
+| 잔줄 강화 T-spin 약화 | Single/Double +1, T-spin 피해 -20% | 전투 보상 | 구현 | flatBonusAdd, typeBonusAdd -0.2 |
+| 기본 줄제거 강화 | Single/Double/Triple +1, T-spin 피해 -30% | 전투 보상 | 구현 | flatBonusAdd, typeBonusAdd -0.3 |
 | Garbage 적용량 감소 | ready garbage 1회 적용량 -1 | 전투 보상 | 미구현 | garbage apply config 필요 |
 | Garbage 도착 지연 | enemy garbage ready 시간 +2초 | 전투 보상 | 미구현 | garbage delay modifier 필요 |
 
@@ -499,11 +527,11 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | --- | --- | --- | --- | --- |
 | 느린 낙하 | gravity 간격 +20% | 상점 | 유지 | gravityMsMultiplier |
 | Lock Delay 증가 | lock delay +200ms | 상점 | 유지 | lockDelayMsAdd |
-| 빠른 낙하 공격 강화 | gravity 간격 x0.75, 공격 피해 +10% | 상점 | 개편 예정 | gravityMsMultiplier, stateBonusAdd +0.1 |
-| 빠른 고정 공격 강화 | lock delay -300ms, 공격 피해 +20% | 상점 | 개편 예정 | lockDelayMsAdd, stateBonusAdd +0.2 |
-| Next 감소 공격 강화 | Next -2, 공격 피해 +10% | 상점 | 개편 예정 | nextPreviewCountAdd, stateBonusAdd +0.1 |
+| 빠른 낙하 공격 강화 | gravity 간격 x0.75, 공격 피해 +10% | 상점 | 구현 | gravityMsMultiplier, stateBonusAdd +0.1 |
+| 빠른 고정 공격 강화 | lock delay -300ms, 공격 피해 +20% | 상점 | 구현 | lockDelayMsAdd, stateBonusAdd +0.2 |
+| Next 감소 공격 강화 | Next -2, 공격 피해 +10% | 상점 | 구현 | nextPreviewCountAdd, stateBonusAdd +0.1 |
 | Lock 감소 B2B 강화 | lock delay -300ms, B2B 공격 피해 +25% | 상점 | 임시 비활성화 예정 | - |
-| Hold 금지 공격 강화 | Hold 비활성화, 공격 피해 +50% | 상점 | Hold 포기로 통합 예정 | Hold 포기: flatBonusAdd +2 |
+| Hold 금지 공격 강화 | Hold 비활성화, 공격 피해 +50% | 상점 | Hold 포기로 통합/비활성화 | Hold 포기: flatBonusAdd +2 |
 | 전투 초반 Gravity 감소 | 전투 초반 gravity 감소 | 상점 | 임시 비활성화 예정 | timed rule 필요 |
 | Danger 빠른 낙하 강화 | Danger 상태 낙하/공격 강화 | 상점 | 임시 비활성화 예정 | conditional rule 필요 |
 | 고정 후 생성 지연 | 고정 후 다음 미노 생성 지연 | 상점 | 임시 비활성화 예정 | spawnDelayMs 필요 |
@@ -523,7 +551,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | --- | --- | --- | --- | --- |
 | Next +1 | Next preview +1 | 상점 | 유지 | nextPreviewCountAdd |
 | Next +2 | Next preview +2 | 상점 | 유지 | nextPreviewCountAdd |
-| Hold 포기 | Hold 비활성화, 모든 공격 추가 피해 +2 | 상점 | 통합 예정 | holdEnabledOverride, flatBonusAdd |
+| Hold 포기 | Hold 비활성화, 모든 공격 추가 피해 +2 | 상점 | 통합 구현 | holdEnabledOverride, flatBonusAdd |
 | Hold 미사용 공격 강화 | Hold 미사용 시 공격 피해 +30% | 상점 | 통합/비활성화 예정 | Hold 포기로 통합 |
 | Hold 금지 공격 강화 | Hold 비활성화, 공격 피해 +50% | 상점 | 통합/비활성화 예정 | Hold 포기로 통합 |
 | Hold 슬롯 +1 | Hold 슬롯 +1 | 상점 | 임시 비활성화 유지 | 다중 Hold 미구현 |
@@ -594,9 +622,9 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 
 ## 구현 우선순위 메모
 
-1. 이미 버킷이 존재하는 확정/개편 예정 유물부터 정리한다: `typeBonusAdd`, `flatBonusAdd`, `comboDamageAdd`, `b2bDamageAdd`, `b2bDamageMultiplierAdd`, `speedBonusPerStackAdd`, `speedBonusCapAdd`, `gravityMsMultiplier`, `lockDelayMsAdd`, `nextPreviewCountAdd`, `holdEnabledOverride`.
+1. 이미 버킷이 존재하는 구현/확정 유물부터 정리한다: `typeBonusAdd`, `flatBonusAdd`, `comboDamageAdd`, `b2bDamageAdd`, `b2bDamageMultiplierAdd`, `speedBonusPerStackAdd`, `speedBonusCapAdd`, `gravityMsMultiplier`, `lockDelayMsAdd`, `nextPreviewCountAdd`, `holdEnabledOverride`.
 2. 이후 `ModifierContext`만 확장하면 되는 조건형을 처리한다: `hasNextPieceT`, `hasNextPieceI`, `usedPieceType`, `isBoss`, `isPerfectClear`, B2B 배수 조건.
-3. 마지막으로 이벤트/상태 저장/전투 중 RuleSet 재평가가 필요한 보류 유물을 처리한다: 상쇄 보너스, Hole 제거, 랜덤형.
+3. 마지막으로 이벤트/상태 저장/전투 중 RuleSet 재평가가 필요한 보류 유물을 처리한다: 상쇄 보너스, 조건부 RuleSet 기반 Hole 유물, 랜덤형.
 
 
 ## ModifierContext에서 지원하는 값
@@ -613,6 +641,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | `isFast` | boolean | Fast 상태 여부 |
 | `fastChain` | number | Fast Chain 수 |
 | `holeCount` | number | 필드 hole 수 |
+| `clearedHoleCount` | number | line clear 전후 `holeCount` 감소량. `Math.max(0, beforeHoleCount - afterHoleCount)`이며 실제 지워진 hole cell 수가 아님 |
 | `deepHoleCount` | number | 깊은 hole 수. 현재 실제 계산은 TODO |
 | `isTSpin` | boolean | T-spin 여부 |
 | `isTSpinMini` | boolean | T-spin Mini 여부 |
@@ -724,7 +753,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 - 미노 종류 조건 유물: `usedPieceType` 또는 `pieceType` ModifierContext 필요. `i_piece_line_bonus`, `t_piece_line_power`, `hard_drop_bonus` 일부.
 - B2B 카운트 조건 유물: `b2bCount` ModifierContext 필요. `b2b_3_power`, `b2b_bonus_plus`, B2B 누적 스케일형.
 - Perfect Clear 조건 유물: `isPerfectClear` ModifierContext 필요. `perfect_clear_power` 및 PC 후속/누적/보스 유물.
-- 이벤트형/다음 공격 버프 유물: Tetris/T-spin/Perfect Clear 후속 공격은 `nextAttackBuff`로 구현됨. PC 후 기본 피해 강화는 `timedAttackBuff`로 구현됨. Hold/Garbage/Hole 후속, 콤보 끊김 방지, 콤보 종료 폭발, B2B 끊김 방지, 첫 B2B 강화는 보류.
+- 이벤트형/다음 공격 버프 유물: Tetris/T-spin/Perfect Clear/Hole 정리 후속 공격은 `nextAttackBuff`로 구현됨. PC 후 기본 피해 강화는 `timedAttackBuff`로 구현됨. Hold/Garbage 후속, 콤보 끊김 방지, 콤보 종료 폭발, B2B 끊김 방지, 첫 B2B 강화는 보류.
 - Garbage 상쇄/수신형 유물: `canceledGarbageLines`, garbage received event, counterBonus modifier 필요. 테트리스/T-spin/Danger/Hole/안정 필드 상쇄 보너스, Garbage 수신 후 강화, 상쇄량 피해.
 - 시간제/전투 중 조건부 RuleSet 유물: 전투 중 조건부 RuleSet 재평가 또는 시간제 버프 필요. 초반 Gravity 감소, Danger Lock Delay 증가, Danger 빠른 낙하 강화, 전투 시작 후 시간제 버프.
 - spawn delay 유물: `spawnDelayMs` RuleSet modifier 필요. 고정 후 생성 지연.

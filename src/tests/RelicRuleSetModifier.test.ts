@@ -24,6 +24,15 @@ describe("Relic rule set modifiers", () => {
     expect(result.lockDelayMs).toBe(700);
   });
 
+  it("applies stable beginner rule relics to effective rule set", () => {
+    const lockDelay = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.stable_lock_delay]);
+    const gravityLock = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.stable_gravity_lock]);
+
+    expect(lockDelay.lockDelayMs).toBe(650);
+    expect(gravityLock.gravityMs).toBe(1035);
+    expect(gravityLock.lockDelayMs).toBe(600);
+  });
+
   it("applies instant_soft_drop as an instant soft drop rule flag", () => {
     const result = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.instant_soft_drop]);
 
@@ -36,6 +45,14 @@ describe("Relic rule set modifiers", () => {
 
     expect(normal.nextPreviewCount).toBe(3);
     expect(clamped.nextPreviewCount).toBe(1);
+  });
+
+  it("applies Next-down flat relics as -1 next preview count", () => {
+    const flatBonus = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.next_down_flat_bonus]);
+    const smallLineBonus = new EffectResolver().resolveEffectiveRuleSet(createBaseRuleSet(), [relicDefinitions.next_down_small_line_bonus]);
+
+    expect(flatBonus.nextPreviewCount).toBe(4);
+    expect(smallLineBonus.nextPreviewCount).toBe(4);
   });
 
   it("applies wide_next as +1 next preview count", () => {

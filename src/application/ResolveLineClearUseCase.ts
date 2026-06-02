@@ -7,6 +7,7 @@ import { relicRewardTable } from "../data/rewardTables";
 import { EnemyPatternSystem } from "../domain/enemy/EnemyPatternSystem";
 import type { GameEvent } from "../domain/shared/GameEvent";
 import { getCurrentNode } from "../domain/run/RunProgression";
+import type { Board } from "../domain/tetris/Board";
 import { noSpinResult, type SpinResult } from "../domain/tetris/SpinDetector";
 import { GarbageQueue } from "../domain/combat/GarbageQueue";
 import { garbageConfig } from "../domain/combat/GarbageConfig";
@@ -39,6 +40,7 @@ export class ResolveLineClearUseCase {
     clearResult: ClearResult = createClearResult({ linesCleared, spinResult, isPerfectClear }),
     nowMs = 0,
     usedPieceType?: TetrominoType,
+    boardBeforeLineClear?: Board,
   ): GameAppState {
     if (!state.combat || !state.run || state.combat.result !== "ongoing") return state;
     if (!state.combat.player.activePiece) {
@@ -55,7 +57,10 @@ export class ResolveLineClearUseCase {
       speedBonusPerStack: state.combat.ruleSet.speedBonusPerStack,
       speedBonusCap: state.combat.ruleSet.speedBonusCap,
     });
-    const attackFieldState = new FieldAnalyzer().analyze(state.combat.player.board);
+    const fieldAnalyzer = new FieldAnalyzer();
+    const attackFieldState = fieldAnalyzer.analyze(state.combat.player.board);
+    const beforeLineClearFieldState = boardBeforeLineClear ? fieldAnalyzer.analyze(boardBeforeLineClear) : attackFieldState;
+    const clearedHoleCount = calculateClearedHoleCount(beforeLineClearFieldState.holeCount, attackFieldState.holeCount, linesCleared);
     const garbageQueue = new GarbageQueue(
       { entryDelayMs: garbageConfig.garbageEntryDelayMs },
       state.combat.enemy.garbageQueue?.getPackets() ??
@@ -74,6 +79,7 @@ export class ResolveLineClearUseCase {
       isFast: state.combat.player.isFastState,
       fastChain: state.combat.player.fastChainCount,
       holeCount: attackFieldState.holeCount,
+      clearedHoleCount,
       isTSpin: clearResult.isTSpin,
       isTSpinMini: clearResult.isTSpinMini,
       isTSpinFull: clearResult.isTSpin && !clearResult.isTSpinMini,
@@ -360,6 +366,11 @@ function isBossRole(role: string): boolean {
 
 function hasAttackEvent(linesCleared: number, clearResult: ClearResult): boolean {
   return linesCleared > 0 || clearResult.isTSpin || clearResult.isPerfectClear;
+}
+
+export function calculateClearedHoleCount(beforeHoleCount: number, afterHoleCount: number, linesCleared: number): number {
+  if (linesCleared <= 0) return 0;
+  return Math.max(0, beforeHoleCount - afterHoleCount);
 }
 
 function nextAttackBuffToRelic(buff: NextAttackBuff): RelicDefinition {

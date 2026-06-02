@@ -22,12 +22,23 @@ describe("Relic reward tables", () => {
     expect(combatRelicIds()).toContain("tspin_followup_power");
     expect(combatRelicIds()).toContain("pc_followup_bonus");
     expect(combatRelicIds()).toContain("pc_timed_base_power");
+    expect(combatRelicIds()).toContain("stable_lock_delay");
+    expect(combatRelicIds()).toContain("stable_gravity_lock");
+    expect(combatRelicIds()).toContain("small_line_bonus");
+    expect(combatRelicIds()).toContain("double_line_bonus");
+    expect(combatRelicIds()).toContain("small_line_tetris_tradeoff");
+    expect(combatRelicIds()).toContain("small_line_tspin_tradeoff");
+    expect(combatRelicIds()).toContain("basic_line_clear_focus");
+    expect(combatRelicIds()).toContain("b2b_power_2");
+    expect(combatRelicIds()).toContain("b2b_under_10_power");
   });
 
   it("excludes shopOnly relics from the combat reward table", () => {
     expect(combatRelicIds()).not.toContain("gentle_fall");
     expect(combatRelicIds()).not.toContain("no_hold_focus");
     expect(combatRelicIds()).not.toContain("instant_soft_drop");
+    expect(combatRelicIds()).not.toContain("next_down_flat_bonus");
+    expect(combatRelicIds()).not.toContain("next_down_small_line_bonus");
   });
 
   it("includes shopOnly relics in the shop reward table", () => {
@@ -36,6 +47,8 @@ describe("Relic reward tables", () => {
     expect(shopRelicIds()).toContain("wide_next");
     expect(shopRelicIds()).toContain("forced_speed");
     expect(shopRelicIds()).toContain("instant_soft_drop");
+    expect(shopRelicIds()).toContain("next_down_flat_bonus");
+    expect(shopRelicIds()).toContain("next_down_small_line_bonus");
   });
 
   it("excludes disabled legacy relics from every reward table", () => {
