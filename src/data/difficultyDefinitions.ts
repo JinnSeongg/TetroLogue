@@ -1,9 +1,9 @@
 import type { DifficultyDefinition, DifficultyId } from "../domain/balance/balanceTypes";
 
 export const difficultyDefinitions: Record<DifficultyId, DifficultyDefinition> = {
-  explorer: {
-    id: "explorer",
-    name: "Explorer",
+  easy: {
+    id: "easy",
+    name: "Easy",
     description: "Lower pressure for learning routes and relic interactions.",
     demandMultiplier: 0.3,
     hpMultiplier: 0.85,
@@ -11,9 +11,9 @@ export const difficultyDefinitions: Record<DifficultyId, DifficultyDefinition> =
     garbageMultiplier: 0.75,
     patternMultiplier: 0.85,
   },
-  standard: {
-    id: "standard",
-    name: "Standard",
+  normal: {
+    id: "normal",
+    name: "Normal",
     description: "Baseline tuning target for a normal run.",
     demandMultiplier: 0.65,
     hpMultiplier: 1,
@@ -21,9 +21,9 @@ export const difficultyDefinitions: Record<DifficultyId, DifficultyDefinition> =
     garbageMultiplier: 1,
     patternMultiplier: 1,
   },
-  advanced: {
-    id: "advanced",
-    name: "Advanced",
+  hard: {
+    id: "hard",
+    name: "Hard",
     description: "Sharper pressure for players comfortable with efficient clears.",
     demandMultiplier: 1,
     hpMultiplier: 1.15,
@@ -31,9 +31,9 @@ export const difficultyDefinitions: Record<DifficultyId, DifficultyDefinition> =
     garbageMultiplier: 1.25,
     patternMultiplier: 1.2,
   },
-  master: {
-    id: "master",
-    name: "Master",
+  expert: {
+    id: "expert",
+    name: "Expert",
     description: "High tempo and stronger enemies for optimized play.",
     demandMultiplier: 1.45,
     hpMultiplier: 1.25,
@@ -41,9 +41,9 @@ export const difficultyDefinitions: Record<DifficultyId, DifficultyDefinition> =
     garbageMultiplier: 1.45,
     patternMultiplier: 1.35,
   },
-  void: {
-    id: "void",
-    name: "Void",
+  master: {
+    id: "master",
+    name: "Master",
     description: "Extreme pressure intended for stress testing and expert runs.",
     demandMultiplier: 2.1,
     hpMultiplier: 1.4,

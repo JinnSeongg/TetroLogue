@@ -8,11 +8,11 @@ type DifficultyOption = {
 };
 
 const difficultyOptions: DifficultyOption[] = [
-  { id: "explorer", targetSkill: "D-C" },
-  { id: "standard", targetSkill: "B-A" },
-  { id: "advanced", targetSkill: "S+" },
-  { id: "master", targetSkill: "SS-U" },
-  { id: "void", targetSkill: "X+ / records" },
+  { id: "easy", targetSkill: "D-C" },
+  { id: "normal", targetSkill: "B-A" },
+  { id: "hard", targetSkill: "S+" },
+  { id: "expert", targetSkill: "SS-U" },
+  { id: "master", targetSkill: "X+ / records" },
 ];
 
 type Props = {
@@ -44,7 +44,7 @@ export function DifficultySelectScreen({ onSelect, onBack }: Props) {
         <div className="difficulty-grid">
           {difficultyOptions.map((option) => {
             const difficulty = difficultyDefinitions[option.id];
-            const recommended = option.id === "standard";
+            const recommended = option.id === "normal";
             return (
               <article
                 aria-label={`Select ${difficulty.name} difficulty`}

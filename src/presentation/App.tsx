@@ -26,7 +26,7 @@ export function App() {
   registerBalanceDebugGlobals(devMode);
 
   const showDifficultySelect = () => setState(controller.showDifficultySelect());
-  const startRun = (difficultyId: DifficultyId = "standard") => setState(controller.startRun(difficultyId));
+  const startRun = (difficultyId: DifficultyId = "normal") => setState(controller.startRun(difficultyId));
   const continueRun = () => setState(controller.continueRun());
   const returnToMenu = () => setState(controller.returnToMenu());
   const handleInput = (input: PlayerInput, nowMs = performance.now(), bufferable = true, initialAction?: InitialActionState) =>

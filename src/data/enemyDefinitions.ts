@@ -1,6 +1,6 @@
 import type { EnemyDefinition } from "../domain/enemy/EnemyDefinition";
 
-export const enemyDefinitions: Record<string, EnemyDefinition> = {
+const rawEnemyDefinitions: Record<string, EnemyDefinition> = {
   enemy_dummy: {
     id: "enemy_dummy",
     name: "Training Dummy",
@@ -484,3 +484,29 @@ export const enemyDefinitions: Record<string, EnemyDefinition> = {
     ],
   },
 };
+
+export const enemyDefinitions: Record<string, EnemyDefinition> = withDefaultGarbagePatterns(rawEnemyDefinitions);
+
+function withDefaultGarbagePatterns(definitions: Record<string, EnemyDefinition>): Record<string, EnemyDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([id, enemy]) => [
+      id,
+      {
+        ...enemy,
+        garbagePattern: enemy.garbagePattern ?? createFixedIntervalGarbagePattern(enemy),
+      },
+    ]),
+  );
+}
+
+function createFixedIntervalGarbagePattern(enemy: EnemyDefinition): EnemyDefinition["garbagePattern"] {
+  const lines = enemy.pattern.garbageLines ?? 0;
+  if (lines <= 0) return undefined;
+  return {
+    type: "fixedInterval",
+    lines,
+    intervalMs: (enemy.pattern.intentEveryActions ?? 6) * 2000,
+    travelDelayMs: 2500,
+    initialDelayMs: 5000,
+  };
+}

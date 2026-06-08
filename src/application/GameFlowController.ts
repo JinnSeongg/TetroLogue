@@ -41,7 +41,7 @@ export class GameFlowController {
     };
   }
 
-  startRun(difficultyId: DifficultyId = "standard"): GameAppState {
+  startRun(difficultyId: DifficultyId = "normal"): GameAppState {
     const state = new StartRunUseCase(this.random).execute(difficultyId);
     this.save(state);
     return state;

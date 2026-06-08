@@ -1,6 +1,6 @@
 import type { EnemyTraitId } from "../enemy/EnemyTrait";
 
-export type DifficultyId = "explorer" | "standard" | "advanced" | "master" | "void";
+export type DifficultyId = "easy" | "normal" | "hard" | "expert" | "master";
 
 export type DifficultyDefinition = {
   id: DifficultyId;

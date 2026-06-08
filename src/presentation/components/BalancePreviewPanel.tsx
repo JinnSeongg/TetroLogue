@@ -12,7 +12,7 @@ import {
 const sampleFloors = new Set([1, 5, 10, 15, 20, 25, 30]);
 
 export function BalancePreviewPanel() {
-  const [difficultyId, setDifficultyId] = useState<DifficultyId>("standard");
+  const [difficultyId, setDifficultyId] = useState<DifficultyId>("normal");
   const [copyStatus, setCopyStatus] = useState("");
   const rows = useMemo(() => getBalancePreviewRows(difficultyId), [difficultyId]);
   const sampleRows = rows.filter((row) => sampleFloors.has(row.floor));

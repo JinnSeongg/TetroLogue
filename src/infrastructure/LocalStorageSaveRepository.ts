@@ -17,6 +17,7 @@ import { createNodeMapFromFloorNodes, floorNodeId } from "../domain/run/RunGener
 import { normalizeRotationState, type RotationState } from "../domain/tetris/rotation/RotationState";
 import { garbageConfig } from "../domain/combat/GarbageConfig";
 import { GarbageQueue, type GarbagePacket } from "../domain/combat/GarbageQueue";
+import { EnemyGarbageScheduler } from "../domain/combat/garbage/EnemyGarbageScheduler";
 import type { ClearResult } from "../domain/tetris/ClearResult";
 import type { ComboB2BResult } from "../domain/combat/ComboB2BTracker";
 import type { CombatFeedbackEvent } from "../domain/combat/CombatFeedbackEvent";
@@ -25,8 +26,10 @@ import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRule
 import { createScaledRuleSet } from "../domain/balance/ruleSetScaler";
 import { createInitialCombatTelemetry, type BattleResultSummary, type CombatTelemetry } from "../domain/combat/BattleResultSummary";
 import type { NextAttackBuff, TimedAttackBuff } from "../domain/combat/CombatState";
+import type { EnemyGarbagePattern } from "../domain/enemy/EnemyDefinition";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
+type LegacyDifficultyId = "explorer" | "standard" | "advanced" | "void";
 
 type SavedGameStateV1 = {
   version: 1;
@@ -36,11 +39,12 @@ type SavedGameStateV1 = {
     nodeMap: NodeMap;
     currentNodeId: string;
     progress?: RunProgressState;
-    difficultyId?: DifficultyId;
+    difficultyId?: DifficultyId | LegacyDifficultyId;
     relics: RelicInstance[];
     status: "map" | "combat" | "event" | "shop" | "reward" | "complete";
   };
   combat?: {
+    baseRuleSet?: TetrisRuleSet;
     ruleSet?: TetrisRuleSet;
     telemetry?: CombatTelemetry;
     player: {
@@ -59,6 +63,8 @@ type SavedGameStateV1 = {
       comboDisplayCount?: number;
       backToBackActive: boolean;
       backToBackCount?: number;
+      consecutiveTetrisCount?: number;
+      consecutiveTSpinCount?: number;
       fastChainCount?: number;
       isFastState?: boolean;
       lastPieceLockTimeMs?: number;
@@ -87,6 +93,11 @@ type SavedGameStateV1 = {
       };
       pendingGarbage: number;
       garbagePackets?: GarbagePacket[];
+      garbagePattern?: EnemyGarbagePattern;
+      enemyGarbageScheduler?: {
+        remainingMs?: number;
+        patternKey?: string;
+      };
     };
     result: "ongoing" | "victory" | "defeat";
     lastAttack?: number;
@@ -128,6 +139,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
       combat: state.combat
         ? {
             ruleSet: state.combat.ruleSet,
+            baseRuleSet: state.combat.baseRuleSet,
             telemetry: state.combat.telemetry,
             player: {
               hp: state.combat.player.hp,
@@ -151,6 +163,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               comboDisplayCount: state.combat.player.comboDisplayCount,
               backToBackActive: state.combat.player.backToBackActive,
               backToBackCount: state.combat.player.backToBackCount,
+              consecutiveTetrisCount: state.combat.player.consecutiveTetrisCount,
+              consecutiveTSpinCount: state.combat.player.consecutiveTSpinCount,
               fastChainCount: state.combat.player.fastChainCount,
               isFastState: state.combat.player.isFastState,
               lastPieceLockTimeMs: state.combat.player.lastPieceLockTimeMs,
@@ -174,6 +188,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               currentIntent: state.combat.enemy.currentIntent,
               pendingGarbage: state.combat.enemy.pendingGarbage,
               garbagePackets: state.combat.enemy.garbageQueue.getPackets(),
+              garbagePattern: state.combat.enemy.garbagePattern,
+              enemyGarbageScheduler: state.combat.enemy.enemyGarbageScheduler.getState(),
             },
             result: state.combat.result,
             lastAttack: state.combat.lastAttack,
@@ -205,7 +221,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
           nodeMap: parsed.run.progress ? parsed.run.nodeMap : createNodeMapFromFloorNodes(progress.nodes),
           currentNodeId: parsed.run.progress ? parsed.run.currentNodeId : floorNodeId(progress.currentFloor),
           progress,
-          difficultyId: parsed.run.difficultyId ?? "standard",
+          difficultyId: normalizeDifficultyId(parsed.run.difficultyId),
           relicInventory: new RelicInventory(validateRelics(parsed.run.relics), relicDefinitions),
           status: parsed.run.status,
         }
@@ -215,6 +231,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
     if (parsed.combat && !combatEnemyDefinition) return undefined;
 
     const combatRuleSet = parsed.combat ? normalizeRuleSet(parsed.combat.ruleSet, parsed.combat.enemy.calculatedStats) : undefined;
+    const combatBaseRuleSet = parsed.combat ? normalizeRuleSet(parsed.combat.baseRuleSet ?? parsed.combat.ruleSet, parsed.combat.enemy.calculatedStats) : undefined;
     const loadedHoldSlot =
       parsed.combat && combatRuleSet
         ? new HoldSlot(
@@ -228,6 +245,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
     const combat =
           parsed.combat && run && combatEnemyDefinition && combatRuleSet && loadedHoldSlot
         ? {
+            baseRuleSet: combatBaseRuleSet,
             ruleSet: combatRuleSet,
             telemetry: parsed.combat.telemetry ?? createInitialCombatTelemetry(),
             player: {
@@ -253,6 +271,8 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               comboDisplayCount: parsed.combat.player.comboDisplayCount ?? Math.max(0, parsed.combat.player.combo - 1),
               backToBackActive: parsed.combat.player.backToBackActive,
               backToBackCount: parsed.combat.player.backToBackCount ?? (parsed.combat.player.backToBackActive ? 1 : 0),
+              consecutiveTetrisCount: normalizeCounter(parsed.combat.player.consecutiveTetrisCount),
+              consecutiveTSpinCount: normalizeCounter(parsed.combat.player.consecutiveTSpinCount),
               fastChainCount: parsed.combat.player.fastChainCount ?? 0,
               isFastState: parsed.combat.player.isFastState ?? false,
               lastPieceLockTimeMs: parsed.combat.player.lastPieceLockTimeMs,
@@ -275,6 +295,7 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
               calculatedStats: parsed.combat.enemy.calculatedStats,
               currentIntent: parsed.combat.enemy.currentIntent,
               pendingGarbage: parsed.combat.enemy.pendingGarbage ?? 0,
+              garbagePattern: parsed.combat.enemy.garbagePattern,
               garbageQueue: new GarbageQueue(
                 { entryDelayMs: garbageConfig.garbageEntryDelayMs },
                 parsed.combat.enemy.garbagePackets ??
@@ -282,13 +303,17 @@ export class LocalStorageSaveRepository implements SaveRunRepository {
                     ? [
                         {
                           id: "garbage_1",
-                          amount: parsed.combat.enemy.pendingGarbage,
-                          source: "loaded_pending",
-                          createdAtMs: 0,
-                          readyAtMs: 0,
+                          lines: parsed.combat.enemy.pendingGarbage,
+                          source: "enemy",
+                          remainingMs: 0,
+                          initialDelayMs: 0,
                         },
                       ]
                     : []),
+              ),
+              enemyGarbageScheduler: new EnemyGarbageScheduler(
+                parsed.combat.enemy.enemyGarbageScheduler?.remainingMs,
+                parsed.combat.enemy.enemyGarbageScheduler?.patternKey,
               ),
             },
             result: parsed.combat.result,
@@ -348,6 +373,14 @@ function normalizeRuleSet(ruleSet: TetrisRuleSet | undefined, stats: EnemyCalcul
   };
 }
 
+function normalizeDifficultyId(difficultyId: DifficultyId | LegacyDifficultyId | undefined): DifficultyId {
+  if (difficultyId === "explorer") return "easy";
+  if (difficultyId === "standard") return "normal";
+  if (difficultyId === "advanced") return "hard";
+  if (difficultyId === "void") return "master";
+  return difficultyId ?? "normal";
+}
+
 function normalizeNextAttackBuffs(value: NextAttackBuff[] | undefined): NextAttackBuff[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -356,6 +389,11 @@ function normalizeNextAttackBuffs(value: NextAttackBuff[] | undefined): NextAtta
       sourceRelicId: buff.sourceRelicId,
       flatBonusAdd: Number.isFinite(buff.flatBonusAdd) ? buff.flatBonusAdd : undefined,
     }));
+}
+
+function normalizeCounter(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
 }
 
 function normalizeTimedAttackBuffs(value: TimedAttackBuff[] | undefined): TimedAttackBuff[] {

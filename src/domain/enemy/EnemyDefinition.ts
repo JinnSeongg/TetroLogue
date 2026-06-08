@@ -31,6 +31,7 @@ export type EnemyDefinition = {
    * consume calculated EnemyCalculatedStats.
    */
   pattern: EnemyPattern;
+  garbagePattern?: EnemyGarbagePattern;
   phases: EnemyPhase[];
 };
 
@@ -54,6 +55,37 @@ export type EnemyPattern = {
   intentDelayActions?: number;
   intentDescription?: string;
   garbageLines?: number;
+};
+
+export type EnemyGarbagePattern =
+  | FixedIntervalGarbagePattern
+  | SequenceGarbagePattern
+  | PhaseGarbagePattern;
+
+export type FixedIntervalGarbagePattern = {
+  type: "fixedInterval";
+  lines: number;
+  intervalMs: number;
+  travelDelayMs: number;
+  initialDelayMs?: number;
+};
+
+export type SequenceGarbagePattern = {
+  type: "sequence";
+  loop: boolean;
+  steps: Array<{
+    delayMs: number;
+    lines: number;
+    travelDelayMs?: number;
+  }>;
+};
+
+export type PhaseGarbagePattern = {
+  type: "phase";
+  phases: Array<{
+    hpRatioGte: number;
+    pattern: FixedIntervalGarbagePattern | SequenceGarbagePattern;
+  }>;
 };
 
 export type EnemyPhase = {

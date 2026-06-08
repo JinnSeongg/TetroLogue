@@ -92,7 +92,7 @@ const skillPower = {
   X: 7,
 } as const;
 
-export function generateBalancePreview(difficultyId: DifficultyId = "standard"): BalancePreview {
+export function generateBalancePreview(difficultyId: DifficultyId = "normal"): BalancePreview {
   const safeDifficultyId = normalizeDifficultyId(difficultyId);
   return {
     difficultyId: safeDifficultyId,
@@ -100,7 +100,7 @@ export function generateBalancePreview(difficultyId: DifficultyId = "standard"):
   };
 }
 
-export function getBalancePreviewRows(difficultyId: DifficultyId = "standard"): BalancePreviewRow[] {
+export function getBalancePreviewRows(difficultyId: DifficultyId = "normal"): BalancePreviewRow[] {
   const safeDifficultyId = normalizeDifficultyId(difficultyId);
   const rng = createDeterministicRng(20260525);
   const recentEnemyIds: string[] = [];
@@ -180,7 +180,7 @@ export function getBalancePreviewRows(difficultyId: DifficultyId = "standard"): 
   });
 }
 
-export function logBalancePreview(difficultyId: DifficultyId = "standard"): BalancePreviewRow[] {
+export function logBalancePreview(difficultyId: DifficultyId = "normal"): BalancePreviewRow[] {
   const rows = getBalancePreviewRows(difficultyId);
   console.table(rows);
   return rows;
@@ -215,7 +215,7 @@ export function balanceRowsToJson(rows: BalancePreviewRow[]): string {
 }
 
 function normalizeDifficultyId(difficultyId: DifficultyId): DifficultyId {
-  return difficultyDefinitions[difficultyId]?.id ?? "standard";
+  return difficultyDefinitions[difficultyId]?.id ?? "normal";
 }
 
 function createDeterministicRng(seed: number): { next: () => number } {

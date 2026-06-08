@@ -2,17 +2,19 @@ import type { GameAppState } from "./GameAppState";
 import type { RandomProvider } from "../domain/shared/RandomProvider";
 import { MovementSystem } from "../domain/tetris/MovementSystem";
 import { GhostPieceCalculator } from "../domain/tetris/GhostPieceCalculator";
-import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
+import type { TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
 import { LockActivePieceUseCase } from "./LockActivePieceUseCase";
 import type { InitialActionState } from "./input/InitialActionState";
 import type { CombatState } from "../domain/combat/CombatState";
 import { createInitialCombatTelemetry } from "../domain/combat/BattleResultSummary";
 import { triggerCombatGameOver } from "./CombatGameOver";
+import { resolveRuntimeRuleSet } from "./ConditionalRuleSet";
+import type { EnemyGarbagePattern } from "../domain/enemy/EnemyDefinition";
 
 export class TickCombatUseCase {
   constructor(
     private readonly random: RandomProvider,
-    private readonly ruleSet: TetrisRuleSet = standardRuleSet,
+    private readonly ruleSet?: TetrisRuleSet,
   ) {}
 
   execute(state: GameAppState, deltaMs: number, softDropSteps = 0, nowMs = 0, initialAction?: InitialActionState): GameAppState {
@@ -23,11 +25,13 @@ export class TickCombatUseCase {
       return triggerCombatGameOver(state, "missingActivePiece", ["activePiece missing during active combat"]);
     }
 
-    const combatWithElapsed = addBattleDuration(combat, deltaMs);
+    const runtimeRuleSet = resolveRuntimeRuleSet(combat, this.ruleSet);
+    const combatWithGarbage = tickEnemyGarbageTimers({ ...combat, ruleSet: runtimeRuleSet }, deltaMs);
+    const combatWithElapsed = addBattleDuration(combatWithGarbage, deltaMs);
     const player = combatWithElapsed.player;
     const movement = new MovementSystem();
     const softDrop =
-      this.ruleSet.instantSoftDrop && softDropSteps > 0
+      runtimeRuleSet.instantSoftDrop && softDropSteps > 0
         ? applyInstantSoftDrop(player.board, piece)
         : applySoftDropSteps(player.board, piece, movement, softDropSteps);
     const activePiece = softDrop.piece;
@@ -37,13 +41,13 @@ export class TickCombatUseCase {
     if (!canFall) {
       const groundedSinceMs = player.isGrounded ? player.groundedSinceMs : nowMs;
       const nextLockElapsed = softDrop.stepsMoved > 0 ? 0 : (player.isGrounded ? player.lockElapsedMs : 0) + deltaMs;
-      if (nextLockElapsed >= this.ruleSet.lockDelayMs) {
+      if (nextLockElapsed >= runtimeRuleSet.lockDelayMs) {
         const stateAfterSoftDrop = {
           ...state,
           combat: { ...combatWithElapsed, player: { ...player, activePiece } },
           events: actionSoundEvents.length > 0 ? [...state.events, ...actionSoundEvents] : state.events,
         };
-        return new LockActivePieceUseCase(this.random, this.ruleSet).execute(stateAfterSoftDrop, activePiece, initialAction, nowMs);
+        return new LockActivePieceUseCase(this.random, runtimeRuleSet).execute(stateAfterSoftDrop, activePiece, initialAction, nowMs);
       }
       return {
         ...state,
@@ -65,7 +69,7 @@ export class TickCombatUseCase {
     }
 
     const elapsed = (softDrop.stepsMoved > 0 ? 0 : player.gravityElapsedMs) + deltaMs;
-    if (elapsed < this.ruleSet.gravityMs) {
+    if (elapsed < runtimeRuleSet.gravityMs) {
       return {
         ...state,
         combat: {
@@ -94,7 +98,7 @@ export class TickCombatUseCase {
         player: {
           ...player,
           activePiece: moved,
-          gravityElapsedMs: elapsed - this.ruleSet.gravityMs,
+          gravityElapsedMs: elapsed - runtimeRuleSet.gravityMs,
           lockElapsedMs: 0,
           softDropActive: softDropSteps > 0,
           isGrounded: movedIsGrounded,
@@ -147,6 +151,44 @@ function addBattleDuration(combat: CombatState, deltaMs: number): CombatState {
       ...(combat.telemetry ?? createInitialCombatTelemetry()),
       battleDurationMs: (combat.telemetry?.battleDurationMs ?? 0) + safeDelta,
     },
+  };
+}
+
+function tickEnemyGarbageTimers(combat: CombatState, deltaMs: number): CombatState {
+  const safeDelta = Number.isFinite(deltaMs) && deltaMs > 0 ? deltaMs : 0;
+  if (safeDelta <= 0) return combat;
+
+  const pattern = resolveEnemyGarbagePattern(combat);
+  const queueAfterTravel = combat.enemy.garbageQueue.tick(safeDelta);
+  const schedulerResult = combat.enemy.enemyGarbageScheduler.tick(safeDelta, pattern);
+  const queueAfterGenerated = schedulerResult.generatedPackets.reduce(
+    (queue, packet) => queue.enqueue(packet.lines, packet.travelDelayMs, packet.source),
+    queueAfterTravel,
+  );
+
+  return {
+    ...combat,
+    enemy: {
+      ...combat.enemy,
+      garbageQueue: queueAfterGenerated,
+      pendingGarbage: queueAfterGenerated.getPendingLines(),
+      enemyGarbageScheduler: schedulerResult.scheduler,
+    },
+  };
+}
+
+function resolveEnemyGarbagePattern(combat: CombatState): EnemyGarbagePattern | undefined {
+  const explicitPattern = combat.enemy.garbagePattern ?? combat.enemy.definition.garbagePattern;
+  if (explicitPattern) return explicitPattern;
+  const lines = combat.enemy.calculatedStats?.garbageLines ?? combat.enemy.definition.pattern.garbageLines ?? 0;
+  if (lines <= 0) return undefined;
+  const legacyInterval = combat.enemy.definition.pattern.intentEveryActions;
+  return {
+    type: "fixedInterval",
+    lines,
+    intervalMs: legacyInterval ? legacyInterval * 2000 : 12000,
+    travelDelayMs: 2500,
+    initialDelayMs: 5000,
   };
 }
 

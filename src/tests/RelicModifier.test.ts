@@ -472,7 +472,6 @@ describe("Relic modifiers", () => {
 
   it.each([
     ["danger_power", relicDefinitions.danger_power, { linesCleared: 4, backToBackActive: false, isDanger: true }, 0.5, 15, 30],
-    ["hole_power", relicDefinitions.hole_power, { linesCleared: 4, backToBackActive: false, holeCount: 3 }, 0.25, 13, 28],
     [
       "garbage_surge",
       relicDefinitions.garbage_surge,
@@ -708,14 +707,95 @@ describe("Relic modifiers", () => {
     expect(afterHold.totalDamage).toBe(4);
   });
 
-  it("applies hole_power when holeCount is at least 3", () => {
-    const result = new EffectResolver().applyAttackModifiers(createAttackResult({ baseAttack: 4 }), [relicDefinitions.hole_power], {
+  it("applies hole_power to normal Single and Double attacks when holeCount is at least 3", () => {
+    const resolver = new EffectResolver();
+    const single = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 1 }), [relicDefinitions.hole_power], {
+      attackKind: "LineClear",
+      linesCleared: 1,
+      backToBackActive: false,
+      holeCount: 3,
+      isTSpin: false,
+    });
+    const double = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 2, linesCleared: 2 }), [relicDefinitions.hole_power], {
+      attackKind: "LineClear",
+      linesCleared: 2,
+      backToBackActive: false,
+      holeCount: 3,
+      isTSpin: false,
+    });
+
+    expect(single.flatBonus).toBe(1);
+    expect(single.totalDamage).toBe(2);
+    expect(double.flatBonus).toBe(1);
+    expect(double.totalDamage).toBe(3);
+  });
+
+  it("does not apply hole_power below threshold or to Tetris, T-spin, and Triple attacks", () => {
+    const resolver = new EffectResolver();
+    const lowHole = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 1 }), [relicDefinitions.hole_power], {
+      attackKind: "LineClear",
+      linesCleared: 1,
+      backToBackActive: false,
+      holeCount: 2,
+      isTSpin: false,
+    });
+    const tetris = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.hole_power], {
+      attackKind: "LineClear",
       linesCleared: 4,
       backToBackActive: false,
       holeCount: 3,
+      isTSpin: false,
+    });
+    const tSpin = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 2, linesCleared: 2 }), [relicDefinitions.hole_power], {
+      attackKind: "TSpin",
+      linesCleared: 2,
+      backToBackActive: false,
+      holeCount: 3,
+      isTSpin: true,
+    });
+    const triple = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 3, linesCleared: 3 }), [relicDefinitions.hole_power], {
+      attackKind: "LineClear",
+      linesCleared: 3,
+      backToBackActive: false,
+      holeCount: 3,
+      isTSpin: false,
     });
 
-    expect(result.totalDamage).toBe(5);
+    expect(lowHole.flatBonus).toBe(0);
+    expect(tetris.flatBonus).toBe(0);
+    expect(tSpin.flatBonus).toBe(0);
+    expect(triple.flatBonus).toBe(0);
+  });
+
+  it("applies broken_field_power to normal Single and Double attacks when holeCount is at least 5", () => {
+    const resolver = new EffectResolver();
+    const single = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 1, linesCleared: 1 }), [relicDefinitions.broken_field_power], {
+      attackKind: "LineClear",
+      linesCleared: 1,
+      backToBackActive: false,
+      holeCount: 5,
+      isTSpin: false,
+    });
+    const double = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 2, linesCleared: 2 }), [relicDefinitions.broken_field_power], {
+      attackKind: "LineClear",
+      linesCleared: 2,
+      backToBackActive: false,
+      holeCount: 5,
+      isTSpin: false,
+    });
+    const triple = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 3, linesCleared: 3 }), [relicDefinitions.broken_field_power], {
+      attackKind: "LineClear",
+      linesCleared: 3,
+      backToBackActive: false,
+      holeCount: 5,
+      isTSpin: false,
+    });
+
+    expect(single.flatBonus).toBe(2);
+    expect(single.totalDamage).toBe(3);
+    expect(double.flatBonus).toBe(2);
+    expect(double.totalDamage).toBe(4);
+    expect(triple.flatBonus).toBe(0);
   });
 
   it("does not apply fast_chain_power as a direct attack modifier", () => {
@@ -1181,10 +1261,79 @@ describe("Relic modifiers", () => {
     expect(result.comboDamage).toBe(0);
   });
 
+  it("applies cancel bonus relics only when canceledGarbageLines is positive and their own condition matches", () => {
+    const resolver = new EffectResolver();
+    const tetris = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.tetris_cancel_bonus], {
+      linesCleared: 4,
+      backToBackActive: false,
+      canceledGarbageLines: 1,
+    });
+    const notTetris = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 2, linesCleared: 3 }), [relicDefinitions.tetris_cancel_bonus], {
+      linesCleared: 3,
+      backToBackActive: false,
+      canceledGarbageLines: 1,
+    });
+    const tSpin = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.tspin_cancel_bonus], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: true,
+      canceledGarbageLines: 1,
+    });
+    const notCanceled = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 2 }), [relicDefinitions.tspin_cancel_bonus], {
+      linesCleared: 2,
+      backToBackActive: false,
+      isTSpin: true,
+      canceledGarbageLines: 0,
+    });
+
+    expect(tetris.counterBonus).toBe(1);
+    expect(notTetris.counterBonus).toBe(0);
+    expect(tSpin.counterBonus).toBe(1);
+    expect(notCanceled.counterBonus).toBe(0);
+  });
+
+  it("applies B2B and stable field cancel bonuses only when their full conditions match", () => {
+    const resolver = new EffectResolver();
+    const b2b = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4, b2bDamage: 1 }), [relicDefinitions.b2b_cancel_bonus], {
+      linesCleared: 4,
+      backToBackActive: true,
+      b2bCount: 1,
+      canceledGarbageLines: 1,
+    });
+    const noB2B = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.b2b_cancel_bonus], {
+      linesCleared: 4,
+      backToBackActive: false,
+      b2bCount: 0,
+      canceledGarbageLines: 1,
+    });
+    const stable = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.stable_field_cancel_bonus_2], {
+      linesCleared: 4,
+      backToBackActive: false,
+      holeCount: 0,
+      fieldHeight: 4,
+      canceledGarbageLines: 1,
+    });
+    const highField = resolver.applyAttackModifiers(createAttackResult({ baseAttack: 4, linesCleared: 4 }), [relicDefinitions.stable_field_cancel_bonus_2], {
+      linesCleared: 4,
+      backToBackActive: false,
+      holeCount: 0,
+      fieldHeight: 5,
+      canceledGarbageLines: 1,
+    });
+
+    expect(b2b.b2bDamage).toBe(2);
+    expect(noB2B.b2bDamage).toBe(0);
+    expect(stable.counterBonus).toBe(2);
+    expect(highField.counterBonus).toBe(0);
+  });
+
   it.each([
     ["isPerfectClear", { isPerfectClear: true }],
     ["isB2BMultipleOf3", { isB2BMultipleOf3: true }],
     ["isB2BMultipleOf10", { isB2BMultipleOf10: true }],
+    ["consecutiveTetrisCount", { consecutiveTetrisCount: { gte: 2 } }],
+    ["consecutiveTSpinCount", { consecutiveTSpinCount: { gte: 2 } }],
+    ["canceledGarbageLines", { canceledGarbageLines: { gte: 1 } }],
     ["hasNextPieceT", { hasNextPieceT: true }],
     ["hasNextPieceI", { hasNextPieceI: true }],
     ["usedPieceType", { usedPieceType: "T" }],
@@ -1205,6 +1354,9 @@ describe("Relic modifiers", () => {
       isPerfectClear: true,
       isB2BMultipleOf3: true,
       isB2BMultipleOf10: true,
+      consecutiveTetrisCount: 2,
+      consecutiveTSpinCount: 2,
+      canceledGarbageLines: 1,
       hasNextPieceT: true,
       hasNextPieceI: true,
       usedPieceType: "T",
@@ -1217,6 +1369,9 @@ describe("Relic modifiers", () => {
       isPerfectClear: false,
       isB2BMultipleOf3: false,
       isB2BMultipleOf10: false,
+      consecutiveTetrisCount: 1,
+      consecutiveTSpinCount: 1,
+      canceledGarbageLines: 0,
       hasNextPieceT: false,
       hasNextPieceI: false,
       usedPieceType: "I",

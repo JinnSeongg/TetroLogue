@@ -11,12 +11,14 @@ import { createEnteredSpawnPiece } from "../domain/tetris/SpawnRules";
 import { createInputBuffer } from "./input/InputBuffer";
 import { garbageConfig } from "../domain/combat/GarbageConfig";
 import { GarbageQueue } from "../domain/combat/GarbageQueue";
+import { EnemyGarbageScheduler } from "../domain/combat/garbage/EnemyGarbageScheduler";
 import { calculateEnemyStats } from "../domain/balance/enemyStatCalculator";
 import type { EnemyRole } from "../domain/balance/balanceTypes";
 import type { EnemyTraitId } from "../domain/enemy/EnemyTrait";
 import { createScaledRuleSet } from "../domain/balance/ruleSetScaler";
 import { createInitialCombatTelemetry } from "../domain/combat/BattleResultSummary";
 import { EffectResolver } from "../domain/relic/EffectResolver";
+import { createScaledGarbagePattern, toGarbageScalingDifficultyId } from "../domain/combat/garbage/GarbageScaling";
 
 export class StartCombatUseCase {
   constructor(private readonly random: RandomProvider) {}
@@ -29,10 +31,14 @@ export class StartCombatUseCase {
     const enemyTraits: EnemyTraitId[] = enemyRole === "finalBoss" && !enemy.traits.includes("final_boss") ? [...enemy.traits, "final_boss"] : enemy.traits;
     const calculatedStats = calculateEnemyStats({
       floor: state.run.progress.currentFloor,
-      difficultyId: state.run.difficultyId ?? "standard",
+      difficultyId: state.run.difficultyId ?? "normal",
       enemyRole,
       traits: enemyTraits,
     });
+    const garbagePattern = createScaledGarbagePattern(
+      state.run.progress.currentFloor,
+      toGarbageScalingDifficultyId(state.run.difficultyId ?? "normal"),
+    );
     const scaledRuleSet = createScaledRuleSet(standardRuleSet, calculatedStats);
     const ruleSetResult = new EffectResolver().resolveEffectiveRuleSet(scaledRuleSet, state.run.relicInventory.getDefinitions(), {
       includeDetails: true,
@@ -67,6 +73,8 @@ export class StartCombatUseCase {
           comboDisplayCount: 0,
           backToBackActive: false,
           backToBackCount: 0,
+          consecutiveTetrisCount: 0,
+          consecutiveTSpinCount: 0,
           fastChainCount: 0,
           isFastState: false,
           lastPieceLockTimeMs: undefined,
@@ -90,7 +98,10 @@ export class StartCombatUseCase {
           calculatedStats,
           pendingGarbage: 0,
           garbageQueue: new GarbageQueue({ entryDelayMs: garbageConfig.garbageEntryDelayMs }),
+          enemyGarbageScheduler: new EnemyGarbageScheduler(),
+          garbagePattern,
         },
+        baseRuleSet: currentCombatRuleSet,
         ruleSet: currentCombatRuleSet,
         ruleSetModifierDebug: {
           baseRuleSet: ruleSetResult.baseRuleSet,

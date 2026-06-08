@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { resolveRuntimeRuleSet } from "../application/ConditionalRuleSet";
+import { StartCombatUseCase } from "../application/StartCombatUseCase";
 import { relicDefinitions } from "../data/relicDefinitions";
+import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
+import { StartRunUseCase } from "../application/StartRunUseCase";
 import { EffectResolver } from "../domain/relic/EffectResolver";
+import type { CombatState } from "../domain/combat/CombatState";
+import { Board } from "../domain/tetris/Board";
+import type { Cell } from "../domain/tetris/Cell";
 import { standardRuleSet, type TetrisRuleSet } from "../domain/tetris/TetrisRuleSet";
 
 describe("Relic rule set modifiers", () => {
@@ -152,8 +159,96 @@ describe("Relic rule set modifiers", () => {
     expect(result.appliedRuleRelicIds).toEqual(["gentle_fall", "no_hold_focus"]);
     expect(result.baseRuleSet).toEqual(createBaseRuleSet());
   });
+
+  it("does not apply conditional Hole rule modifiers when holeCount is 0", () => {
+    const result = new EffectResolver().resolveConditionalRuleSet(
+      createBaseRuleSet(),
+      [relicDefinitions.hole_gravity_relief, relicDefinitions.hole_lock_delay],
+      { linesCleared: 0, backToBackActive: false, holeCount: 0 },
+    );
+
+    expect(result).toEqual(createBaseRuleSet());
+  });
+
+  it("applies Hole gravity relief when holeCount is at least 1", () => {
+    const result = new EffectResolver().resolveConditionalRuleSet(createBaseRuleSet(), [relicDefinitions.hole_gravity_relief], {
+      linesCleared: 0,
+      backToBackActive: false,
+      holeCount: 1,
+    });
+
+    expect(result.gravityMs).toBe(990);
+  });
+
+  it("multiplies stacked Hole gravity relief modifiers when both conditions match", () => {
+    const result = new EffectResolver().resolveConditionalRuleSet(
+      createBaseRuleSet(),
+      [relicDefinitions.hole_gravity_relief, relicDefinitions.hole_gravity_relief_2],
+      { linesCleared: 0, backToBackActive: false, holeCount: 10 },
+    );
+
+    expect(result.gravityMs).toBe(1287);
+  });
+
+  it("applies Hole lock delay when holeCount is at least 3", () => {
+    const result = new EffectResolver().resolveConditionalRuleSet(createBaseRuleSet(), [relicDefinitions.hole_lock_delay], {
+      linesCleared: 0,
+      backToBackActive: false,
+      holeCount: 3,
+    });
+
+    expect(result.lockDelayMs).toBe(600);
+  });
+
+  it("recalculates conditional RuleSet from base effective RuleSet without accumulating", () => {
+    const started = withBoard(startCombatWithRelics(901, ["hole_gravity_relief"]), boardWithHoles(1));
+    const first = resolveRuntimeRuleSet(started.combat!);
+    const second = resolveRuntimeRuleSet({ ...started.combat!, ruleSet: first });
+
+    expect(first.gravityMs).toBe(990);
+    expect(second.gravityMs).toBe(990);
+  });
+
+  it("combines passive RuleSet relics with conditional Hole RuleSet relics", () => {
+    const started = withBoard(startCombatWithRelics(902, ["stable_gravity_lock", "hole_gravity_relief", "hole_lock_delay"]), boardWithHoles(3));
+    const runtimeRuleSet = resolveRuntimeRuleSet(started.combat!);
+
+    expect(started.combat?.baseRuleSet?.gravityMs).toBe(1035);
+    expect(runtimeRuleSet.gravityMs).toBe(1139);
+    expect(runtimeRuleSet.lockDelayMs).toBe(700);
+  });
 });
 
 function createBaseRuleSet(): TetrisRuleSet {
   return { ...standardRuleSet };
+}
+
+function startCombatWithRelics(seed: number, relicIds: string[]) {
+  const run = new StartRunUseCase().execute();
+  const withRelics = run.run
+    ? {
+        ...run,
+        run: {
+          ...run.run,
+          relicInventory: relicIds.reduce((inventory, relicId) => inventory.add(relicId), run.run.relicInventory),
+        },
+      }
+    : run;
+  return new StartCombatUseCase(new SeededRandomProvider(seed)).execute(withRelics);
+}
+
+function withBoard<T extends { combat?: CombatState }>(state: T, board: Board): T {
+  if (!state.combat) return state;
+  return { ...state, combat: { ...state.combat, player: { ...state.combat.player, board } } };
+}
+
+function boardWithHoles(holeCount: number): Board {
+  const rows = Array.from({ length: 20 }, () => ".".repeat(10));
+  rows[18] = "X".repeat(Math.max(0, Math.min(10, holeCount))) + ".".repeat(Math.max(0, 10 - holeCount));
+  rows[19] = ".".repeat(Math.max(0, Math.min(10, holeCount))) + "X".repeat(Math.max(0, 10 - holeCount));
+  return new Board(
+    10,
+    20,
+    rows.map((row) => [...row].map((value): Cell => (value === "X" ? { filled: true, pieceType: "I" } : { filled: false }))),
+  );
 }

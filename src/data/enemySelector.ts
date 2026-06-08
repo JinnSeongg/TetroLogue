@@ -6,16 +6,16 @@ import { enemyDefinitions } from "./enemyDefinitions";
 type EnemySelectorRng = Pick<RandomProvider, "next">;
 
 const difficultyProgressOffset: Record<DifficultyId, number> = {
-  explorer: -0.1,
-  standard: 0,
-  advanced: 0.08,
-  master: 0.14,
-  void: 0.2,
+  easy: -0.1,
+  normal: 0,
+  hard: 0.08,
+  expert: 0.14,
+  master: 0.2,
 };
 
 export function selectEnemyForFloor(
   floor: number,
-  difficultyId: DifficultyId = "standard",
+  difficultyId: DifficultyId = "normal",
   rng?: EnemySelectorRng,
   recentEnemyIds: readonly string[] = [],
 ): EnemyDefinition {

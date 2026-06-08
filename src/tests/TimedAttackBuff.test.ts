@@ -62,6 +62,24 @@ describe("timed attack buffs", () => {
     expect(result?.counterBonus).toBe(0);
   });
 
+  it("does not apply timed stateBonusAdd on a non-clear lock", () => {
+    const random = new SeededRandomProvider(137);
+    const started = withTimedAttackBuffs(startCombatWithRelics(137), [
+      { sourceRelicId: "pc_timed_base_power", remainingMs: 20000, stateBonusAdd: 0.2 },
+    ]);
+    const enemyHp = started.combat?.enemy.hp;
+
+    const miss = new ResolveLineClearUseCase(random).execute(started, 0);
+    const result = lastAttackResult(miss);
+
+    expect(result?.stateBonus).toBe(0);
+    expect(result?.totalDamage).toBe(0);
+    expect(miss.combat?.enemy.hp).toBe(enemyHp);
+    expect(miss.combat?.player.timedAttackBuffs).toEqual([
+      { sourceRelicId: "pc_timed_base_power", remainingMs: 20000, stateBonusAdd: 0.2 },
+    ]);
+  });
+
   it("expires timed attack buffs after their remaining duration passes", () => {
     const random = new SeededRandomProvider(133);
     const started = withTimedAttackBuffs(startCombatWithRelics(133), [

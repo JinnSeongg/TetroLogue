@@ -9,7 +9,7 @@ import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
 describe("battle result summary", () => {
   it("records combat outcome metrics when a battle ends", () => {
     const random = new SeededRandomProvider(301);
-    const started = new StartCombatUseCase(random).execute(new StartRunUseCase(random).execute("standard"));
+    const started = new StartCombatUseCase(random).execute(new StartRunUseCase(random).execute("normal"));
     const state = withWeakEnemyAndPendingGarbage(started, 2);
 
     const result = new ResolveLineClearUseCase(random).execute(state, 4);
@@ -17,7 +17,7 @@ describe("battle result summary", () => {
 
     expect(summary).toMatchObject({
       floor: 1,
-      difficultyId: "standard",
+      difficultyId: "normal",
       result: "win",
       totalAttackBlockedByPendingGarbage: 2,
       totalGarbageCancelled: 2,

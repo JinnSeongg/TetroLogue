@@ -15,7 +15,7 @@ export function ShopScreen({ reward, relics, onSelect, onLeave }: Props) {
         <p className="eyebrow">Shop</p>
         <h1>Pick a Relic</h1>
         {(reward?.choices.length ?? 0) === 0 ? (
-          <p className="empty-reward-message">구매 가능한 유물이 없습니다.</p>
+          <p className="empty-reward-message">구매 가?�한 ?�물???�습?�다.</p>
         ) : (
           <div className="reward-card-grid">
             {(reward?.choices ?? []).map((choice) => {

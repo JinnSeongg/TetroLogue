@@ -10,7 +10,7 @@ import { selectEnemyForFloor } from "../data/enemySelector";
 export class StartRunUseCase {
   constructor(private readonly random?: Pick<RandomProvider, "next">) {}
 
-  execute(difficultyId: DifficultyId = "standard"): GameAppState {
+  execute(difficultyId: DifficultyId = "normal"): GameAppState {
     const seededProgress = createRunProgressState(
       generateRunNodes({
         random: this.random,

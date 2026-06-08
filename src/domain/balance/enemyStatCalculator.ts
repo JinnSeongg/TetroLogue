@@ -15,7 +15,7 @@ export function calculateEnemyStats(
   input: EnemyStatCalculationInput,
   config: BalanceConfig = balanceConfig,
 ): EnemyCalculatedStats {
-  const difficulty = difficultyDefinitions[input.difficultyId ?? "standard"];
+  const difficulty = difficultyDefinitions[input.difficultyId ?? "normal"];
   const enemyRole = input.enemyRole ?? "normal";
   const roleMultiplier = config.enemyRoleMultipliers[enemyRole];
   const floor = clampFloor(input.floor, config);
@@ -56,8 +56,8 @@ export function calculateEnemyStats(
   return finalizeStats(applyEnemyTraitEffects(stats, input.traits ?? [], config), enemyRole, difficulty, baseHp, config);
 }
 
-export function sampleStandardNormalStats(floors = [1, 10, 20, 30]): EnemyCalculatedStats[] {
-  return floors.map((floor) => calculateEnemyStats({ floor, difficultyId: "standard", enemyRole: "normal" }));
+export function sampleNormalStats(floors = [1, 10, 20, 30]): EnemyCalculatedStats[] {
+  return floors.map((floor) => calculateEnemyStats({ floor, difficultyId: "normal", enemyRole: "normal" }));
 }
 
 function calculateGarbageLines(patternPressure: number, config: BalanceConfig): number {
@@ -79,7 +79,7 @@ function finalizeStats(
   config: BalanceConfig,
 ): EnemyCalculatedStats {
   const hpLimits = config.hpToBaseHpRatioLimits[enemyRole];
-  const maxHp = clampHp(Math.round(clampRoleRatio(stats.maxHp, baseHp, hpLimits, difficulty.id !== "explorer")), config);
+  const maxHp = clampHp(Math.round(clampRoleRatio(stats.maxHp, baseHp, hpLimits, difficulty.id !== "easy")), config);
   const gpmCap = getGpmCap(difficulty.id, enemyRole, config);
   const uncappedEnemyGpm = stats.uncappedEnemyGpm;
   const enemyGpm = round(Math.min(uncappedEnemyGpm, gpmCap), 3);
@@ -100,7 +100,7 @@ function finalizeStats(
 }
 
 function getGpmCap(difficultyId: DifficultyDefinition["id"], enemyRole: EnemyRole, config: BalanceConfig): number {
-  const cap = config.garbage.gpmCapsByDifficulty[difficultyId] ?? config.garbage.gpmCapsByDifficulty.standard;
+  const cap = config.garbage.gpmCapsByDifficulty[difficultyId] ?? config.garbage.gpmCapsByDifficulty.normal;
   return isBossLikeRole(enemyRole) ? cap.boss : cap.normal;
 }
 

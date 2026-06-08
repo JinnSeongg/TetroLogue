@@ -22,7 +22,7 @@ export function generateRunNodes({
   maxFloor = 30,
   eventChance = 0.2,
   random,
-  difficultyId = "standard",
+  difficultyId = "normal",
   selectEnemyIdForFloor = selectLegacyEnemyIdForFloor,
 }: GenerateRunNodesOptions = {}): FloorNode[] {
   const recentEnemyIds: string[] = [];

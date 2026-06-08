@@ -11,6 +11,8 @@ import { ScreenShakeController } from "./ScreenShakeController";
 import { DangerVisualController } from "./DangerVisualController";
 import { GarbageGauge } from "./GarbageGauge";
 import { BalancePreviewPanel } from "./BalancePreviewPanel";
+import { selectEnemyAttackWarningState } from "../../domain/combat/EnemyAttackWarningSelector";
+import { EnemyAttackWarningView } from "./EnemyAttackWarningView";
 
 type Props = {
   state: GameAppState;
@@ -22,7 +24,8 @@ type Props = {
 
 export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode, settings }: Props) {
   const combat = state.combat;
-  const garbagePreview = combat?.enemy.garbageQueue.getPreview(performance.now());
+  const garbagePreview = combat?.enemy.garbageQueue.getPreview();
+  const attackWarning = selectEnemyAttackWarningState(combat);
   const floor = state.run?.progress.currentFloor;
   const activePieceOpacity = combat ? lockDelayOpacity(combat.player.isGrounded, combat.player.lockElapsedMs, combat.ruleSet.lockDelayMs) : undefined;
   return (
@@ -37,6 +40,7 @@ export function CombatScreen({ state, onDebugLineClear, onReturnToMenu, devMode,
                   <div className="play-area-wrapper">
                     <header className="combat-top-bar">
                       <CombatHUD combat={combat} attackAnimation={attackAnimation} />
+                      <EnemyAttackWarningView warning={attackWarning} />
                       <button onClick={onReturnToMenu}>Menu</button>
                     </header>
                     <section className="combat-layout">

@@ -5,26 +5,26 @@ import { SeededRandomProvider } from "../infrastructure/SeededRandomProvider";
 
 describe("enemy selector", () => {
   it("selects final boss candidates on floor 30", () => {
-    const enemy = selectEnemyForFloor(30, "standard", { next: () => 0 });
+    const enemy = selectEnemyForFloor(30, "normal", { next: () => 0 });
 
     expect(enemy.role).toBe("finalBoss");
   });
 
   it("selects boss or miniboss candidates on boss floors", () => {
-    const enemy = selectEnemyForFloor(15, "standard", { next: () => 0.6 });
+    const enemy = selectEnemyForFloor(15, "normal", { next: () => 0.6 });
 
     expect(["boss", "miniboss"]).toContain(enemy.role);
   });
 
   it("lets later ordinary floors reach elite candidates", () => {
-    const enemy = selectEnemyForFloor(27, "standard", { next: () => 0.99 });
+    const enemy = selectEnemyForFloor(27, "normal", { next: () => 0.99 });
 
     expect(enemy.role).toBe("elite");
   });
 
   it("avoids very recent enemies when alternatives exist", () => {
-    const first = selectEnemyForFloor(1, "standard", { next: () => 0 });
-    const second = selectEnemyForFloor(2, "standard", { next: () => 0 }, [first.id]);
+    const first = selectEnemyForFloor(1, "normal", { next: () => 0 });
+    const second = selectEnemyForFloor(2, "normal", { next: () => 0 }, [first.id]);
 
     expect(second.id).not.toBe(first.id);
   });
@@ -34,7 +34,7 @@ describe("enemy selector", () => {
     const nodes = generateRunNodes({
       random,
       eventChance: 0,
-      difficultyId: "standard",
+      difficultyId: "normal",
       selectEnemyIdForFloor: (floor, difficultyId, rng, recentEnemyIds) =>
         selectEnemyForFloor(floor, difficultyId, rng, recentEnemyIds).id,
     });

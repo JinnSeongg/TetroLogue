@@ -4,13 +4,13 @@ import { calculateEnemyStats } from "../domain/balance/enemyStatCalculator";
 import { safeNumber, safeRatio, safeText } from "../debug/balanceDebugGuards";
 
 describe("balance debug preview", () => {
-  it("generates 1-30 standard preview rows with guarded values", () => {
-    const rows = getBalancePreviewRows("standard");
+  it("generates 1-30 normal preview rows with guarded values", () => {
+    const rows = getBalancePreviewRows("normal");
 
     expect(rows).toHaveLength(30);
     for (const row of rows) {
       expect(row.floor).toBeGreaterThanOrEqual(1);
-      expect(row.difficulty).toBe("standard");
+      expect(row.difficulty).toBe("normal");
       expect(row.selectedEnemyId.length).toBeGreaterThan(0);
       expect(row.selectedEnemyName.length).toBeGreaterThan(0);
       expect(row.maxHp).toBeGreaterThan(0);
@@ -54,7 +54,7 @@ describe("balance debug preview", () => {
   });
 
   it("uses the new relic average and SkillPower ratios at floor 30", () => {
-    const floor30 = getBalancePreviewRows("standard").find((row) => row.floor === 30);
+    const floor30 = getBalancePreviewRows("normal").find((row) => row.floor === 30);
     if (!floor30) throw new Error("Expected floor 30 preview row");
 
     expect(floor30.relicAvgPower).toBeCloseTo(3, 3);
@@ -62,7 +62,7 @@ describe("balance debug preview", () => {
   });
 
   it("exposes enemy demand breakdown without changing the final demand", () => {
-    const floor30 = getBalancePreviewRows("standard").find((row) => row.floor === 30);
+    const floor30 = getBalancePreviewRows("normal").find((row) => row.floor === 30);
     if (!floor30) throw new Error("Expected floor 30 preview row");
 
     expect(floor30.difficultyMultiplier).toBe(0.65);
@@ -71,7 +71,7 @@ describe("balance debug preview", () => {
   });
 
   it("does not multiply relic average into enemy demand", () => {
-    const floor30 = getBalancePreviewRows("standard").find((row) => row.floor === 30);
+    const floor30 = getBalancePreviewRows("normal").find((row) => row.floor === 30);
     if (!floor30) throw new Error("Expected floor 30 preview row");
 
     expect(floor30.rawEnemyDemand).toBeCloseTo(4.095, 3);
@@ -83,11 +83,11 @@ describe("balance debug preview", () => {
 
   it("uses the new difficulty demand multipliers for normal enemies", () => {
     const expected = [
-      ["explorer", 0.3, 1.26],
-      ["standard", 0.65, 2.73],
-      ["advanced", 1, 4.2],
-      ["master", 1.45, 6.09],
-      ["void", 2.1, 8.82],
+      ["easy", 0.3, 1.26],
+      ["normal", 0.65, 2.73],
+      ["hard", 1, 4.2],
+      ["expert", 1.45, 6.09],
+      ["master", 2.1, 8.82],
     ] as const;
 
     for (const [difficulty, multiplier, demand] of expected) {
@@ -101,30 +101,30 @@ describe("balance debug preview", () => {
   });
 
   it("matches the adjusted floor 30 final boss ratio targets", () => {
-    const standard = getBalancePreviewRows("standard").find((row) => row.floor === 30);
-    const advanced = getBalancePreviewRows("advanced").find((row) => row.floor === 30);
+    const normal = getBalancePreviewRows("normal").find((row) => row.floor === 30);
+    const hard = getBalancePreviewRows("hard").find((row) => row.floor === 30);
+    const expert = getBalancePreviewRows("expert").find((row) => row.floor === 30);
     const master = getBalancePreviewRows("master").find((row) => row.floor === 30);
-    const voidRow = getBalancePreviewRows("void").find((row) => row.floor === 30);
-    if (!standard || !advanced || !master || !voidRow) throw new Error("Expected floor 30 preview rows");
+    if (!normal || !hard || !expert || !master) throw new Error("Expected floor 30 preview rows");
 
-    expect(standard.enemyDemand).toBeCloseTo(4.095, 3);
-    expect(standard.ratioBAvgRelic).toBeCloseTo(1.365, 3);
-    expect(standard.ratioAAvgRelic).toBeCloseTo(0.975, 3);
-    expect(standard.ratioSAvgRelic).toBeCloseTo(0.62, 3);
+    expect(normal.enemyDemand).toBeCloseTo(4.095, 3);
+    expect(normal.ratioBAvgRelic).toBeCloseTo(1.365, 3);
+    expect(normal.ratioAAvgRelic).toBeCloseTo(0.975, 3);
+    expect(normal.ratioSAvgRelic).toBeCloseTo(0.62, 3);
 
-    expect(advanced.enemyDemand).toBeCloseTo(6.3, 3);
-    expect(advanced.ratioSAvgRelic).toBeCloseTo(0.955, 3);
+    expect(hard.enemyDemand).toBeCloseTo(6.3, 3);
+    expect(hard.ratioSAvgRelic).toBeCloseTo(0.955, 3);
 
-    expect(master.enemyDemand).toBeCloseTo(9.135, 3);
-    expect(master.ratioSSAvgRelic).toBeCloseTo(0.87, 3);
-    expect(master.ratioUAvgRelic).toBeCloseTo(0.609, 3);
+    expect(expert.enemyDemand).toBeCloseTo(9.135, 3);
+    expect(expert.ratioSSAvgRelic).toBeCloseTo(0.87, 3);
+    expect(expert.ratioUAvgRelic).toBeCloseTo(0.609, 3);
 
-    expect(voidRow.enemyDemand).toBeCloseTo(13.23, 3);
-    expect(voidRow.ratioXAvgRelic).toBeCloseTo(0.63, 3);
+    expect(master.enemyDemand).toBeCloseTo(13.23, 3);
+    expect(master.ratioXAvgRelic).toBeCloseTo(0.63, 3);
   });
 
-  it("keeps standard final boss HP in the target duration range", () => {
-    const floor30 = getBalancePreviewRows("standard").find((row) => row.floor === 30);
+  it("keeps normal final boss HP in the target duration range", () => {
+    const floor30 = getBalancePreviewRows("normal").find((row) => row.floor === 30);
     if (!floor30) throw new Error("Expected floor 30 preview row");
 
     expect(floor30.role).toBe("finalBoss");
@@ -143,8 +143,8 @@ describe("balance debug preview", () => {
   it("returns a preview wrapper and logs with console.table", () => {
     const table = vi.spyOn(console, "table").mockImplementation(() => undefined);
 
-    expect(generateBalancePreview("standard").rows).toHaveLength(30);
-    expect(logBalancePreview("standard")).toHaveLength(30);
+    expect(generateBalancePreview("normal").rows).toHaveLength(30);
+    expect(logBalancePreview("normal")).toHaveLength(30);
     expect(table).toHaveBeenCalledOnce();
 
     table.mockRestore();

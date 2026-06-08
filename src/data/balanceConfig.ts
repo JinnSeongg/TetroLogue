@@ -99,11 +99,11 @@ export const balanceConfig = {
     maxGarbageLines: 8,
     garbageLinesPressureDivisor: 3.25,
     gpmCapsByDifficulty: {
-      explorer: { normal: 4, boss: 6 },
-      standard: { normal: 8, boss: 12 },
-      advanced: { normal: 12, boss: 16 },
-      master: { normal: 16, boss: 22 },
-      void: { normal: 24, boss: 32 },
+      easy: { normal: 4, boss: 6 },
+      normal: { normal: 8, boss: 12 },
+      hard: { normal: 12, boss: 16 },
+      expert: { normal: 16, boss: 22 },
+      master: { normal: 24, boss: 32 },
     },
   },
   pressureWeights: {

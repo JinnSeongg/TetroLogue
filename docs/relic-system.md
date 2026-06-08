@@ -81,6 +81,38 @@ clearedHoleCount:
 - hole이 줄어들지 않았거나 line clear가 없는 lock이면 `0`이다.
 - 이 값은 실제 지워진 hole cell 수가 아니라 line clear 전후 `holeCount` 감소량이다.
 
+conditionalRuleSet:
+
+- 현재 최소 구현은 Hole 조건부 RuleSet만 지원한다.
+- 전투 시작 시 `StartCombatUseCase`가 passive RuleSet modifier까지 반영한 RuleSet을 `combat.baseRuleSet`에 저장한다.
+- 전투 중 runtime RuleSet은 `combat.baseRuleSet`에서 현재 보드의 `holeCount` 조건을 다시 적용해 계산하고 `combat.ruleSet`에 저장한다.
+- 조건부 보정은 현재 `combat.ruleSet`에 누적하지 않는다. tick 시작 또는 board 변경 후 항상 `combat.baseRuleSet`에서 다시 계산한다.
+- 지원 trigger는 `conditionalRuleSet`이다.
+- 지원 필드는 `gravityMsMultiplier`, `lockDelayMsAdd`, `when`, `whenAny`이다.
+- 안전 제한은 기존 RuleSet modifier와 동일하다: `gravityMs` 최소 50ms, `lockDelayMs` 최소 0ms.
+- 여러 조건부 RuleSet 유물이 동시에 참이면 모두 적용한다. gravity 배율은 순서대로 곱해진다. 예: Hole 10개 이상에서 `hole_gravity_relief`와 `hole_gravity_relief_2`를 함께 보유하면 `gravityMs * 1.1 * 1.3`이다.
+- 구현된 Hole 조건부 RuleSet 유물: `hole_gravity_relief`, `hole_gravity_relief_2`, `hole_lock_delay`.
+
+consecutive attack counts:
+
+- 저장 위치는 `player.consecutiveTetrisCount`, `player.consecutiveTSpinCount`이다.
+- 전투 시작 시 둘 다 `0`이다.
+- Tetris 성공 시 `consecutiveTetrisCount += 1`, `consecutiveTSpinCount = 0`이다.
+- 줄 제거가 있는 T-spin 성공 시 `consecutiveTSpinCount += 1`, `consecutiveTetrisCount = 0`이다.
+- 그 외 줄 제거 공격 또는 줄 제거 없는 lock은 둘 다 `0`으로 초기화한다.
+- 이번 공격이 연속 카운트에 포함된 상태로 `ModifierContext`에 들어간다. 예: 두 번째 연속 Tetris의 `consecutiveTetrisCount`는 `2`이다.
+- 구현된 유물: `consecutive_tetris_power`, `consecutive_tspin_power`, `consecutive_tspin_flat`.
+
+canceledGarbageLines:
+
+- `canceledGarbageLines`는 이번 공격으로 내 pending garbage queue에서 실제 제거된 줄 수이다.
+- 계산 위치는 `ResolveLineClearUseCase`의 garbage cancel 처리이다.
+- 정의는 `garbageQueue.cancelWithAttack()` 결과의 `cancelledGarbage`이며, 공격이 없거나 상쇄한 garbage가 없으면 `0`이다.
+- 이 값은 상대에게 넘어간 공격량이 아니라 내 queue에서 제거된 줄 수이다.
+- 상쇄 보너스 적용 순서는 1차 공격값으로 garbage cancel을 먼저 확정한 뒤, 확정된 `canceledGarbageLines`를 `ModifierContext`에 넣어 최종 공격 피해를 다시 계산한다.
+- 이때 `counterBonusAdd` 등 상쇄 보너스로 증가한 피해는 적 피해에만 반영되고 garbage cancel량을 다시 늘리지 않는다.
+- Garbage형 유물 전체는 계속 disabled이며, 이번 구현은 Tetris/T-spin/B2B/안정 필드 상쇄 보너스만 combatReward로 추가한다.
+
 Combo/Perfect Clear:
 
 - ComboTable 구간형 값은 `comboDamage`로 본다: 0~1 = 0, 2~3 = 1, 4~5 = 2, 6~8 = 3, 9+ = 4.
@@ -207,7 +239,7 @@ flatBonus += addAttack
 | 항목 | 현재 구현 | 메모 |
 | --- | --- | --- |
 | Danger형 | `obtainSource: "disabled"` | 새 조건/이벤트 없이 일단 보상 풀에서 제외 |
-| Garbage형 | `obtainSource: "disabled"` | `canceledGarbageLines` 등 새 context 필요 항목은 보류 |
+| Garbage형 | `obtainSource: "disabled"` | Garbage형 전체 disabled 유지. `canceledGarbageLines` 기반 중 안전한 비-Garbage형 상쇄 보너스만 구현 |
 | Lock 감소 B2B 강화 | `obtainSource: "disabled"` | 조건부 RuleSet/효과 재검토 전까지 제외 |
 | Hold 포기 | `no_hold_focus`로 통합 | Hold 비활성화 + 모든 공격 `flatBonusAdd: 2` |
 | Hold 미사용 공격 강화 | `holdless_focus` disabled | Hold 포기로 통합 |
@@ -266,12 +298,15 @@ flatBonus += addAttack
 | `small_line_tetris_tradeoff` | 잔줄 강화 Tetris 약화 | `combo` | `uncommon` | 일반 Single/Double +1, Tetris 피해 -20% | 신규 구현 |
 | `small_line_tspin_tradeoff` | 잔줄 강화 T-spin 약화 | `combo` | `uncommon` | 일반 Single/Double +1, T-spin 피해 -20% | 신규 구현 |
 | `basic_line_clear_focus` | 기본 줄제거 강화 | `combo` | `rare` | 일반 Single/Double/Triple +1, T-spin 피해 -30% | 신규 구현 |
-| `hole_power` | Hole 보유 공격 강화 | `hole` | `common` | hole 3개 이상 공격 피해 +25% | 기존 유지 |
-| `broken_field_power` | Hole 다수 공격 강화 | `hole` | `rare` | hole 5개 이상 공격 피해 +50% | 기존 유지 |
+| `hole_power` | Hole 잔줄 추가타 1 | `hole` | `common` | hole 3개 이상 일반 Single/Double 추가 피해 +1 | 개편 구현 |
+| `broken_field_power` | Hole 잔줄 추가타 2 | `hole` | `rare` | hole 5개 이상 일반 Single/Double 추가 피해 +2 | 개편 구현 |
 | `hole_tspin_power` | Hole T-spin 강화 | `hole` | `uncommon` | Hole 보유 상태 T-spin 공격 피해 +25% | 기존 유지 |
 | `hole_clear_damage` | Hole 제거 피해 | `hole` | `common` | Hole 제거 시 추가 피해 +1 | 신규 구현 |
 | `hole_clear_followup` | Hole 정리 후속 추가타 | `hole` | `uncommon` | Hole 제거 후 다음 공격 추가 피해 +1 | 신규 구현 |
 | `boss_hole_clear_bonus` | 보스 Hole 제거 추가타 | `hole` | `uncommon` | 보스전 Hole 제거 시 추가 피해 +1 | 신규 구현 |
+| `hole_gravity_relief` | Hole 낙하 완화 | `hole` | `common` | Hole 1개 이상이면 gravity 간격 +10% | 신규 구현 |
+| `hole_gravity_relief_2` | Hole 낙하 완화 2 | `hole` | `rare` | Hole 10개 이상이면 gravity 간격 +30% | 신규 구현 |
+| `hole_lock_delay` | Hole Lock Delay 증가 | `hole` | `uncommon` | Hole 3개 이상이면 lock delay +100ms | 신규 구현 |
 | `low_field_power` | 낮은 필드 공격 강화 | `perfectClear` | `uncommon` | 낮은 필드 공격 피해 +20% | 기존 유지 |
 | `clean_field_power` | 안정 필드 공격 강화 | `perfectClear` | `uncommon` | Hole이 없고 낮은 필드면 공격 피해 +25% | 기존 유지 |
 | `perfect_clear_flat_1` | Perfect Clear 추가타 1 | `perfectClear` | `common` | Perfect Clear 피해 +3 | 신규 구현 |
@@ -343,8 +378,8 @@ flatBonus += addAttack
 | 테트리스 강화 2 | Tetris 공격 피해 +50% | 전투 보상 | 확정 | typeBonusAdd |
 | Tetris 특화 강화 | Tetris 공격 피해 +30%, T-spin 공격 피해 -30% | 전투 보상 | 확정 | typeBonusAdd |
 | 테트리스 후속 강화 | Tetris 성공 후 다음 공격 추가 피해 +2 | 전투 보상 | 구현 | nextAttackBuff |
-| 연속 테트리스 강화 | 연속 Tetris 횟수 기반 강화 | 전투 보상 | 보류 | consecutiveTetrisCount 필요 |
-| 테트리스 상쇄 보너스 | Tetris로 garbage 상쇄 시 보너스 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
+| 연속 테트리스 강화 | 연속 Tetris 2회 이상 Tetris 피해 +25% | 전투 보상 | 구현 | typeBonusAdd, consecutiveTetrisCount |
+| 테트리스 상쇄 보너스 | Tetris로 garbage 상쇄 시 추가 피해 +1 | 전투 보상 | 구현 | counterBonusAdd, canceledGarbageLines |
 | Next I 테트리스 강화 | Next에 I가 있으면 Tetris 강화 | 전투 보상 | 구현 | typeBonusAdd, hasNextPieceI |
 | I 미노 추가타 | I 미노 줄제거 추가 피해 | 전투 보상 | 구현 | flatBonusAdd, usedPieceType |
 | 보스 테트리스 강화 | 보스전 Tetris 공격 피해 +25% | 전투 보상 | 구현 | typeBonusAdd, isBoss |
@@ -366,9 +401,9 @@ flatBonus += addAttack
 | T-spin 특화 강화 | T-spin 공격 피해 +30%, Tetris 공격 피해 -30% | 전투 보상 | 구현 | typeBonusAdd |
 | Next T T-spin 강화 | Next에 T가 있으면 T-spin 강화 | 전투 보상 | 구현 | typeBonusAdd, hasNextPieceT |
 | T-spin 후속 강화 | T-spin 성공 후 다음 공격 추가 피해 +2 | 전투 보상 | 구현 | nextAttackBuff |
-| 연속 T-spin 강화 | 연속 T-spin 횟수 기반 강화 | 전투 보상 | 보류 | consecutiveTSpinCount 필요 |
-| 연속 T-spin 추가타 | 연속 T-spin 추가 피해 | 전투 보상 | 보류 | consecutiveTSpinCount 필요 |
-| T-spin 상쇄 보너스 | T-spin으로 garbage 상쇄 시 보너스 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
+| 연속 T-spin 강화 | 연속 T-spin 2회 이상 T-spin 피해 +25% | 전투 보상 | 구현 | typeBonusAdd, consecutiveTSpinCount |
+| 연속 T-spin 추가타 | 연속 T-spin 3회 이상 추가 피해 +2 | 전투 보상 | 구현 | flatBonusAdd, consecutiveTSpinCount |
+| T-spin 상쇄 보너스 | T-spin으로 garbage 상쇄 시 추가 피해 +1 | 전투 보상 | 구현 | counterBonusAdd, canceledGarbageLines |
 | T 미노 줄제거 강화 | T 미노 줄제거 공격 강화 | 전투 보상 | 구현 | stateBonusAdd, usedPieceType |
 | 보스 T-spin 강화 | 보스전 T-spin 공격 피해 +25% | 전투 보상 | 구현 | typeBonusAdd, isBoss |
 
@@ -390,7 +425,7 @@ flatBonus += addAttack
 | B2B 10배수 추가타 | b2bCount가 10의 배수이면 B2B 추가 피해 +10 | 전투 보상 | 구현 | b2bDamageAdd, isB2BMultipleOf10 |
 | B2B 유지 강화 | b2bCount >= 10일 때 B2B 피해 +15% | 전투 보상 | 구현 | b2bDamageMultiplierAdd +0.15 |
 | B2B 끊김 방지 | B2B 끊김 1회 방지 | 전투 보상 | 보류 | B2B break hook 필요 |
-| B2B 상쇄 보너스 | B2B 공격으로 garbage 상쇄 시 보너스 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
+| B2B 상쇄 보너스 | B2B 공격으로 garbage 상쇄 시 B2B 피해 +1 | 전투 보상 | 구현 | b2bDamageAdd, b2bCount, canceledGarbageLines |
 | 보스 B2B 강화 | 보스전 B2B 피해 +20% | 전투 보상 | 구현 | b2bDamageMultiplierAdd, isBoss |
 
 ---
@@ -436,15 +471,15 @@ flatBonus += addAttack
 
 | 이름 | 최신 효과 | 획득처 | 처리 상태 | 구현 버킷 / 필요 기반 |
 | --- | --- | --- | --- | --- |
-| Hole 잔줄 추가타 1 | hole 3개 이상일 때 Single/Double 피해 +1 | 전투 보상 | 개편 예정 | flatBonusAdd, holeCount |
-| Hole 잔줄 추가타 2 | hole 5개 이상일 때 Single/Double 피해 +2 | 전투 보상 | 개편 예정 | flatBonusAdd, holeCount |
-| Hole 낙하 완화 | hole 1개 이상이면 gravity 간격 +10% | 전투 보상 | 신규 예정 | 조건부 RuleSet 필요 |
+| Hole 잔줄 추가타 1 | hole 3개 이상일 때 일반 Single/Double 피해 +1 | 전투 보상 | 구현 | flatBonusAdd, holeCount, attackKind, linesCleared, isTSpin |
+| Hole 잔줄 추가타 2 | hole 5개 이상일 때 일반 Single/Double 피해 +2 | 전투 보상 | 구현 | flatBonusAdd, holeCount, attackKind, linesCleared, isTSpin |
+| Hole 낙하 완화 | hole 1개 이상이면 gravity 간격 +10% | 전투 보상 | 구현 | conditionalRuleSet, holeCount |
 | Deep Hole 낙하 완화 | Deep Hole 존재 시 gravity 간격 +20% | 전투 보상 | 보류 | deepHoleCount 실제 계산 필요 |
 | Hole 제거 피해 | Hole 제거 시 1 피해 | 전투 보상 | 구현 | clearedHoleCount |
 | Hole 정리 후속 추가타 | Hole 정리 후 다음 공격 +1 피해 | 전투 보상 | 구현 | nextAttackBuff, clearedHoleCount |
-| Hole 낙하 완화 2 | hole 10개 이상이면 gravity 간격 +30% | 전투 보상 | 신규 예정 / Hole 2개 이상 제거 추가타 대체 | 조건부 RuleSet 필요 |
+| Hole 낙하 완화 2 | hole 10개 이상이면 gravity 간격 +30% | 전투 보상 | 구현 / Hole 2개 이상 제거 추가타 대체 | conditionalRuleSet, holeCount |
 | Hole 상쇄 보너스 | Hole을 지우면 큐 대기 garbage 1줄 추가 제거 | 전투 보상 | 보류 | clearedHoleCount, queue cancel hook 필요 |
-| Hole Lock Delay 증가 | hole 3개 이상 존재 시 lock delay +100ms | 전투 보상 | 신규 예정 | 조건부 RuleSet 필요 |
+| Hole Lock Delay 증가 | hole 3개 이상 존재 시 lock delay +100ms | 전투 보상 | 구현 | conditionalRuleSet, holeCount |
 | 보스 Hole 제거 추가타 | 보스전 Hole 제거 시 +1 피해 | 전투 보상 | 구현 | isBoss, clearedHoleCount |
 
 ---
@@ -460,8 +495,8 @@ flatBonus += addAttack
 | PC 후 기본 피해 강화 | PC 후 20초간 base 피해 +20% | 전투 보상 | 구현 | timedAttackBuff, stateBonusAdd |
 | PC Garbage 제거 | PC 시 garbage queue 모두 제거 | 전투 보상 | 보류 | PC trigger + queue clear 필요 |
 | PC 후속 추가타 | PC 후 다음 공격 +3 피해 | 전투 보상 | 구현 | nextAttackBuff |
-| 안정 필드 상쇄 보너스 1 | 안정 필드일 때 Garbage 상쇄 보너스 +1 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
-| 안정 필드 상쇄 보너스 2 | 안정 필드일 때 Garbage 상쇄 보너스 +2 | 전투 보상 | 보류 | canceledGarbageLines 필요 |
+| 안정 필드 상쇄 보너스 1 | 안정 필드에서 garbage 상쇄 시 추가 피해 +1 | 전투 보상 | 구현 | counterBonusAdd, holeCount, fieldHeight, canceledGarbageLines |
+| 안정 필드 상쇄 보너스 2 | 안정 필드에서 garbage 상쇄 시 추가 피해 +2 | 전투 보상 | 구현 | counterBonusAdd, holeCount, fieldHeight, canceledGarbageLines |
 | PC 누적 강화 | PC 할 때마다 PC 피해 +10% | 전투 보상 | 보류 | PC count 저장 필요 |
 
 ---
@@ -591,13 +626,13 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | `isPerfectClear` | Perfect Clear형 |
 | `isB2BMultipleOf3` | B2B 3배수 강화 |
 | `isB2BMultipleOf10` | B2B 10배수 추가타 |
-| `consecutiveTetrisCount` | 연속 테트리스 강화 |
-| `consecutiveTSpinCount` | 연속 T-spin 강화 |
+| `consecutiveTetrisCount` | 구현됨: 연속 테트리스 강화 |
+| `consecutiveTSpinCount` | 구현됨: 연속 T-spin 강화, 연속 T-spin 추가타 |
 | `nextAttackBuff` | 후속 강화류 |
 | `timedBuff` | PC 후 20초 버프 |
-| `canceledGarbageLines` | 상쇄 보너스, Garbage 콤보 |
+| `canceledGarbageLines` | 구현됨: Tetris/T-spin/B2B/안정 필드 상쇄 보너스. Garbage 콤보는 보류 |
 | `clearedHoleCount` | Hole 제거 피해, Hole 상쇄 |
-| 조건부 RuleSet 재평가 | Hole 낙하 완화, Hole Lock Delay |
+| 조건부 RuleSet 재평가 | 구현됨: Hole 낙하 완화, Hole Lock Delay |
 | `instantSoftDrop` | 소프트드랍 즉시 낙하 |
 | `fastBreakEvent` | Fast 종료 피해 |
 | `spawnDelayMs` | 고정 후 생성 지연 |
@@ -624,7 +659,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 
 1. 이미 버킷이 존재하는 구현/확정 유물부터 정리한다: `typeBonusAdd`, `flatBonusAdd`, `comboDamageAdd`, `b2bDamageAdd`, `b2bDamageMultiplierAdd`, `speedBonusPerStackAdd`, `speedBonusCapAdd`, `gravityMsMultiplier`, `lockDelayMsAdd`, `nextPreviewCountAdd`, `holdEnabledOverride`.
 2. 이후 `ModifierContext`만 확장하면 되는 조건형을 처리한다: `hasNextPieceT`, `hasNextPieceI`, `usedPieceType`, `isBoss`, `isPerfectClear`, B2B 배수 조건.
-3. 마지막으로 이벤트/상태 저장/전투 중 RuleSet 재평가가 필요한 보류 유물을 처리한다: 상쇄 보너스, 조건부 RuleSet 기반 Hole 유물, 랜덤형.
+3. 마지막으로 이벤트/상태 저장이 필요한 보류 유물을 처리한다: 상쇄 보너스, 랜덤형.
 
 
 ## ModifierContext에서 지원하는 값
@@ -638,6 +673,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | `fieldHeight` | number | 필드 최대 높이 |
 | `holdUsedThisBattle` | boolean | 이번 전투에서 Hold를 성공적으로 사용했는지 |
 | `pendingGarbageLines` | number | 대기 중인 garbage 총량 |
+| `canceledGarbageLines` | number | 이번 공격으로 내 pending garbage queue에서 실제 상쇄 제거된 줄 수 |
 | `isFast` | boolean | Fast 상태 여부 |
 | `fastChain` | number | Fast Chain 수 |
 | `holeCount` | number | 필드 hole 수 |
@@ -649,6 +685,8 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 | `combo` | number | 공격 계산 후 combo 값 |
 | `comboBonus` | number | 기본 공격 계산의 combo bonus |
 | `attackKind` | string | 공격 종류 문자열 |
+| `consecutiveTetrisCount` | number | 이번 공격을 포함한 연속 Tetris 횟수 |
+| `consecutiveTSpinCount` | number | 이번 공격을 포함한 연속 T-spin 횟수 |
 
 ## 조건식 문법
 
@@ -755,7 +793,7 @@ Garbage형은 전부 임시 비활성화 예정으로 정리한다.
 - Perfect Clear 조건 유물: `isPerfectClear` ModifierContext 필요. `perfect_clear_power` 및 PC 후속/누적/보스 유물.
 - 이벤트형/다음 공격 버프 유물: Tetris/T-spin/Perfect Clear/Hole 정리 후속 공격은 `nextAttackBuff`로 구현됨. PC 후 기본 피해 강화는 `timedAttackBuff`로 구현됨. Hold/Garbage 후속, 콤보 끊김 방지, 콤보 종료 폭발, B2B 끊김 방지, 첫 B2B 강화는 보류.
 - Garbage 상쇄/수신형 유물: `canceledGarbageLines`, garbage received event, counterBonus modifier 필요. 테트리스/T-spin/Danger/Hole/안정 필드 상쇄 보너스, Garbage 수신 후 강화, 상쇄량 피해.
-- 시간제/전투 중 조건부 RuleSet 유물: 전투 중 조건부 RuleSet 재평가 또는 시간제 버프 필요. 초반 Gravity 감소, Danger Lock Delay 증가, Danger 빠른 낙하 강화, 전투 시작 후 시간제 버프.
+- 시간제/전투 중 조건부 RuleSet 유물: Hole 조건부 RuleSet은 구현됨. 초반 Gravity 감소, Danger Lock Delay 증가, Danger 빠른 낙하 강화, 전투 시작 후 시간제 버프는 보류.
 - spawn delay 유물: `spawnDelayMs` RuleSet modifier 필요. 고정 후 생성 지연.
 - 랜덤/확률형 유물: 확률 판정 시스템과 랜덤 효과 정의 필요. 랜덤 피해 배율, 확률 추가타, 확률 2배 공격, 확률 Garbage 감소, 랜덤 유형 강화, 랜덤 미노 추가타, 공격 강화 Garbage 증가, 확률 B2B 유지, 콤보 강화 실패 페널티, 확률 생존.
 - 사망 직전 생존형 유물: top out 직전 생존 이벤트 훅 필요.

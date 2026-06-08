@@ -63,10 +63,39 @@ describe("next attack buffs", () => {
     const miss = new ResolveLineClearUseCase(random).execute(started, 0);
     const followup = new ResolveLineClearUseCase(random).execute(miss, 1);
 
+    expect(lastAttackResult(miss)?.flatBonus).toBe(0);
+    expect(lastAttackResult(miss)?.totalDamage).toBe(0);
     expect(miss.combat?.player.nextAttackBuffs).toEqual([{ sourceRelicId: "tetris_followup_power", flatBonusAdd: 2 }]);
     expect(lastAttackResult(followup)?.flatBonus).toBe(2);
     expect(lastAttackResult(followup)?.totalDamage).toBe(2);
     expect(followup.combat?.player.nextAttackBuffs).toEqual([]);
+  });
+
+  it("does not apply all-attack flat bonuses or create follow-up buffs on a non-clear lock", () => {
+    const random = new SeededRandomProvider(127);
+    const started = startCombatWithRelics(127, ["no_hold_focus", "tetris_followup_power"]);
+    const enemyHp = started.combat?.enemy.hp;
+
+    const miss = new ResolveLineClearUseCase(random).execute(started, 0);
+    const result = lastAttackResult(miss);
+
+    expect(result?.flatBonus).toBe(0);
+    expect(result?.totalDamage).toBe(0);
+    expect(result?.appliedRelicIds).toEqual([]);
+    expect(miss.combat?.enemy.hp).toBe(enemyHp);
+    expect(miss.combat?.player.nextAttackBuffs).toEqual([]);
+  });
+
+  it("applies all-attack flat bonuses when a line clear attacks", () => {
+    const random = new SeededRandomProvider(128);
+    const started = startCombatWithRelics(128, ["no_hold_focus"]);
+
+    const single = new ResolveLineClearUseCase(random).execute(started, 1);
+    const result = lastAttackResult(single);
+
+    expect(result?.flatBonus).toBe(2);
+    expect(result?.totalDamage).toBe(2);
+    expect(result?.appliedRelicIds).toContain("no_hold_focus");
   });
 
   it("keeps one buff per source relic when the same follow-up relic triggers again", () => {

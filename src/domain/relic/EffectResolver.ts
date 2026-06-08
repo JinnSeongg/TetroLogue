@@ -207,6 +207,48 @@ export class EffectResolver {
       appliedRuleRelicIds: [...new Set(appliedRuleRelicIds)],
     };
   }
+
+  resolveConditionalRuleSet(baseRuleSet: TetrisRuleSet, relics: RelicDefinition[], context: Omit<ModifierContext, "attack">): TetrisRuleSet;
+  resolveConditionalRuleSet(
+    baseRuleSet: TetrisRuleSet,
+    relics: RelicDefinition[],
+    context: Omit<ModifierContext, "attack">,
+    options: { includeDetails: true },
+  ): RuleSetModifierApplicationResult;
+  resolveConditionalRuleSet(
+    baseRuleSet: TetrisRuleSet,
+    relics: RelicDefinition[],
+    context: Omit<ModifierContext, "attack">,
+    options?: { includeDetails: true },
+  ): TetrisRuleSet | RuleSetModifierApplicationResult {
+    const appliedRuleRelicIds: string[] = [];
+    const ruleSet = relics.reduce<TetrisRuleSet>((currentRuleSet, relic) => {
+      return relic.modifiers.reduce<TetrisRuleSet>((current, modifier) => {
+        if (modifier.trigger !== "conditionalRuleSet") return current;
+        if (!modifierApplies(modifier, { ...context, attack: 0 })) return current;
+        const next = sanitizeRuleSet({
+          ...current,
+          gravityMs:
+            modifier.gravityMsMultiplier === undefined
+              ? current.gravityMs
+              : current.gravityMs * sanitizeRuleSetMultiplier(modifier.gravityMsMultiplier),
+          lockDelayMs: current.lockDelayMs + sanitizeRuleSetAdd(modifier.lockDelayMsAdd),
+        });
+        if (ruleSetChanged(current, next)) {
+          appliedRuleRelicIds.push(String(relic.id));
+        }
+        return next;
+      }, currentRuleSet);
+    }, sanitizeRuleSet({ ...baseRuleSet }));
+
+    if (!options?.includeDetails) return ruleSet;
+
+    return {
+      ruleSet,
+      baseRuleSet: { ...baseRuleSet },
+      appliedRuleRelicIds: [...new Set(appliedRuleRelicIds)],
+    };
+  }
 }
 
 function sanitizeAttack(value: number): number {

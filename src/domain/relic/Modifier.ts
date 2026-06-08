@@ -6,6 +6,7 @@ export type ModifierContext = {
   fieldHeight?: number;
   holdUsedThisBattle?: boolean;
   pendingGarbageLines?: number;
+  canceledGarbageLines?: number;
   isFast?: boolean;
   fastChain?: number;
   holeCount?: number;
@@ -22,6 +23,8 @@ export type ModifierContext = {
   b2bCount?: number;
   isB2BMultipleOf3?: boolean;
   isB2BMultipleOf10?: boolean;
+  consecutiveTetrisCount?: number;
+  consecutiveTSpinCount?: number;
   hasNextPieceT?: boolean;
   hasNextPieceI?: boolean;
   usedPieceType?: string;
@@ -79,6 +82,14 @@ export type PassiveModifier = {
   instantSoftDrop?: boolean;
 };
 
+export type ConditionalRuleSetModifier = {
+  trigger: "conditionalRuleSet";
+  gravityMsMultiplier?: number;
+  lockDelayMsAdd?: number;
+  when?: ModifierConditionSet;
+  whenAny?: ModifierConditionSet[];
+};
+
 export type NextAttackBuffModifier = {
   trigger: "onAttackResolved";
   flatBonusAdd?: number;
@@ -88,9 +99,9 @@ export type NextAttackBuffModifier = {
   whenAny?: ModifierConditionSet[];
 };
 
-export type Modifier = AttackModifier | PassiveModifier | NextAttackBuffModifier;
+export type Modifier = AttackModifier | PassiveModifier | ConditionalRuleSetModifier | NextAttackBuffModifier;
 
-export const modifierApplies = (modifier: AttackModifier | NextAttackBuffModifier, context: ModifierContext): boolean => {
+export const modifierApplies = (modifier: AttackModifier | ConditionalRuleSetModifier | NextAttackBuffModifier, context: ModifierContext): boolean => {
   const whenMatches = modifier.when === undefined || conditionSetMatches(modifier.when, context);
   const whenAnyMatches =
     modifier.whenAny === undefined || modifier.whenAny.some((conditionSet) => conditionSetMatches(conditionSet, context));

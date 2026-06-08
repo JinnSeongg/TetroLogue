@@ -9,6 +9,8 @@ import type { EnemyIntent } from "../enemy/EnemyIntent";
 import type { GameEvent } from "../shared/GameEvent";
 import type { LastSpinAction, SpinResult } from "../tetris/SpinDetector";
 import type { GarbageQueue } from "./GarbageQueue";
+import type { EnemyGarbageScheduler } from "./garbage/EnemyGarbageScheduler";
+import type { EnemyGarbagePattern } from "../enemy/EnemyDefinition";
 import type { ClearResult } from "../tetris/ClearResult";
 import type { ComboB2BResult } from "./ComboB2BTracker";
 import type { CombatFeedbackEvent } from "./CombatFeedbackEvent";
@@ -44,6 +46,8 @@ export type PlayerCombatState = {
   comboDisplayCount: number;
   backToBackActive: boolean;
   backToBackCount: number;
+  consecutiveTetrisCount: number;
+  consecutiveTSpinCount: number;
   fastChainCount: number;
   isFastState: boolean;
   lastPieceLockTimeMs?: number;
@@ -69,11 +73,14 @@ export type EnemyCombatState = {
   currentIntent?: EnemyIntent;
   pendingGarbage: number;
   garbageQueue: GarbageQueue;
+  enemyGarbageScheduler: EnemyGarbageScheduler;
+  garbagePattern?: EnemyGarbagePattern;
 };
 
 export type CombatState = {
   player: PlayerCombatState;
   enemy: EnemyCombatState;
+  baseRuleSet?: TetrisRuleSet;
   ruleSet: TetrisRuleSet;
   ruleSetModifierDebug?: {
     baseRuleSet: TetrisRuleSet;
